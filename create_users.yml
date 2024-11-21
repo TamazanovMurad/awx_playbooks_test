@@ -16,15 +16,22 @@
         src: files/users.txt
         dest: "{{ user_file }}"
 
-    - name: Read the user file
+    - name: Read and parse the user file
       win_shell: |
-        Get-Content {{ user_file }}
+        Get-Content "{{ user_file }}" | ForEach-Object {
+          $parts = $_ -split ':'
+          [PSCustomObject]@{
+            Name = $parts[0]
+            Password = $parts[1]
+            Group = $parts[2]
+          }
+        } | ConvertTo-Json -Depth 1
       register: user_data
 
-    - name: Parse and create users
+    - name: Create users from parsed data
       win_user:
-        name: "{{ item.0 }}"
-        password: "{{ item.1 }}"
-        groups: "{{ item[2] | default('Users') }}"
+        name: "{{ item.Name }}"
+        password: "{{ item.Password }}"
+        groups: "{{ item.Group }}"
         state: present
-      with_items: "{{ user_data.stdout_lines | map('split', ':') }}"
+      with_items: "{{ user_data.stdout | from_json }}"
