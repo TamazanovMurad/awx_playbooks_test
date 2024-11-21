@@ -1,0 +1,31 @@
+---
+- name: Create Windows Users from File
+  hosts: windows
+  gather_facts: no
+
+  tasks:
+    # Kopiere die Datei auf die Zielmaschine
+    - name: Copy user file to target machine
+      ansible.builtin.copy:
+        src: files/users.txt
+        dest: C:\Temp\users.txt
+
+    # Lese die Datei auf der Zielmaschine ein
+    - name: Read user data from file
+      ansible.builtin.shell: "type C:\\Temp\\users.txt"
+      register: user_file_content
+
+    # Benutzer aus der Datei erstellen
+    - name: Create Windows users from file content
+      win_user:
+        name: "{{ item[0] }}"
+        password: "{{ item[1] }}"
+        state: present
+        groups: "{{ item[2] }}"
+        update_password: on_create
+      with_items: "{{ user_data }}"
+      vars:
+        user_data: >-
+          {{
+            user_file_content.stdout_lines | map("split", ",")
+          }}
