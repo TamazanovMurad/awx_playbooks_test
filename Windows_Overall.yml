@@ -10,7 +10,7 @@
       setup:
 
     - name: Install Google Chrome using Chocolatey
-      win_chocolatey:
+      community.windows.win_chocolatey:
         name: googlechrome
         state: present
 
@@ -65,6 +65,12 @@
         path: C:\inetpub\wwwroot\mywebsite
         state: directory
 
+    - name: Deploy custom website files (example)
+      win_copy:
+        src: /path/to/local/website/files/
+        dest: C:\inetpub\wwwroot\mywebsite\
+        remote_src: no
+
     - name: Restart IIS to apply changes
       win_service:
         name: W3SVC
@@ -95,6 +101,6 @@
       mail:
         host: smtp.yourserver.com
         port: 25
-        to: "murad.tamazanov@htl-braunau.at"
+        to: "admin@example.com"
         subject: "Windows Server Update Complete"
         body: "The playbook has completed successfully. All updates and tasks were applied."
