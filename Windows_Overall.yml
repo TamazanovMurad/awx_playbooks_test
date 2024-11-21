@@ -13,11 +13,15 @@
       register: winrm_status
       failed_when: winrm_status.state != "started"
 
-    # Install a list of software packages
+    # Install Chocolatey package manager (if not installed)
     - name: Install Chocolatey package manager
-      win_chocolatey_facts:
-    
-    - name: Install common software using Chocolatey
+      win_chocolatey:
+        name: chocolatey
+        state: present
+      when: ansible_facts['chocolatey'] is not defined
+
+    # Install common software using Chocolatey
+    - name: Install common software
       win_chocolatey:
         name: "{{ item }}"
         state: present
@@ -45,7 +49,6 @@
         localport: 5985
         protocol: TCP
         direction: in
-        localport: 5985
         action: allow
 
     # Set registry values for system optimization
@@ -63,7 +66,7 @@
         description: "This task cleans temporary files every day"
         actions:
           - path: "cmd.exe"
-            arguments: "/c del /q /f %TEMP%\*"
+            arguments: "/c del /q /f {{ lookup('env', 'TEMP') }}\\*"
         trigger:
           - type: daily
             start_boundary: "2024-11-21T09:00:00"
