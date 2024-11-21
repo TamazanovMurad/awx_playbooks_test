@@ -1,94 +1,100 @@
 ---
-- name: Advanced Windows Management with Ansible
+- name: Automate and Hardening Windows Server
   hosts: windows
   gather_facts: yes
   tasks:
+    - name: Test connectivity to Windows
+      win_ping:
 
-    # Check if WinRM is enabled
-    - name: Ensure WinRM is enabled and running
-      win_service:
-        name: WinRM
-        state: started
-        enabled: yes
-      register: winrm_status
-      failed_when: winrm_status.state != "started"
+    - name: Gather system facts (for inventory)
+      setup:
 
-    # Install Chocolatey package manager (if not installed)
-    - name: Install Chocolatey package manager
+    - name: Install Google Chrome using Chocolatey
       win_chocolatey:
-        name: chocolatey
-        state: present
-      when: ansible_facts['chocolatey'] is not defined
-
-    # Install common software using Chocolatey
-    - name: Install common software
-      win_chocolatey:
-        name: "{{ item }}"
-        state: present
-      loop:
-        - googlechrome
-        - vscode
-        - notepadplusplus
-        - git
-      register: choco_install
-      ignore_errors: yes
-
-    # Create a user account
-    - name: Create a new Windows user
-      win_user:
-        name: 'test_user'
-        password: 'SecurePassword123'
-        state: present
-        groups: 'Administrators'
-        update_password: on_create
-
-    # Set up Windows Firewall rules
-    - name: Allow inbound rule for PowerShell Remoting
-      win_firewall_rule:
-        name: 'Allow PowerShell Remoting'
-        localport: 5985
-        protocol: TCP
-        direction: in
-        action: allow
-
-    # Set registry values for system optimization
-    - name: Set registry key for system optimization
-      win_regedit:
-        path: HKCU\Control Panel\Desktop
-        name: ScreenSaveActive
-        data: '1'
-        type: string
-
-    # Create scheduled task to clean temp files every day
-    - name: Schedule a task to clean up temp files daily
-      win_scheduled_task:
-        name: "Clean Temp Files"
-        description: "This task cleans temporary files every day"
-        actions:
-          - path: "cmd.exe"
-            arguments: "/c del /q /f {{ lookup('env', 'TEMP') }}\\*"
-        trigger:
-          - type: daily
-            start_boundary: "2024-11-21T09:00:00"
+        name: googlechrome
         state: present
 
-    # Apply a Windows update
-    - name: Install Windows updates
+    - name: Install critical and security updates
       win_updates:
         category_names:
-          - "SecurityUpdates"
-          - "CriticalUpdates"
-        reboot: yes
+          - CriticalUpdates
+          - SecurityUpdates
+        state: installed
+      register: update_result
 
-    # Set system time zone
-    - name: Set Windows system time zone to 'UTC'
+    - name: Reboot system if updates require it
+      win_reboot:
+        when: update_result.reboot_required
+
+    - name: Disable Windows Defender Real-Time Protection (if needed for specific cases)
+      win_service:
+        name: WinDefend
+        state: stopped
+        start_mode: disabled
+
+    - name: Set Windows time zone to UTC
       win_timezone:
         timezone: UTC
 
-    # Output system information
-    - name: Display system info
-      debug:
-        msg: "Operating System: {{ ansible_facts['os_family'] }} {{ ansible_facts['os'] }} Version: {{ ansible_facts['distribution_version'] }}"
+    - name: Enable Windows Defender Antivirus
+      win_service:
+        name: WinDefend
+        state: started
+        start_mode: auto
 
-  vars:
-    clean_up: true
+    - name: Disable unused ports (disable SMBv1, for example)
+      win_feature:
+        name: FS-SMB1
+        state: absent
+
+    - name: Enable Windows firewall and configure inbound rules
+      win_firewall_rule:
+        name: "Allow SSH"
+        localport: 22
+        protocol: TCP
+        action: allow
+        enable: yes
+
+    - name: Install and configure IIS Web Server
+      win_feature:
+        name: Web-Server
+        state: present
+
+    - name: Create directory structure for IIS website
+      win_file:
+        path: C:\inetpub\wwwroot\mywebsite
+        state: directory
+
+    - name: Restart IIS to apply changes
+      win_service:
+        name: W3SVC
+        state: restarted
+
+    - name: Enable and configure SNMP service
+      win_feature:
+        name: SNMP-Service
+        state: present
+      register: snmp_status
+
+    - name: Start SNMP service if installed
+      win_service:
+        name: SNMP
+        state: started
+        start_mode: auto
+      when: snmp_status.changed
+
+    - name: Set up logging for Windows updates
+      win_eventlog:
+        name: Application
+        source: Microsoft-Windows-UpdateAgent
+        type: Information
+        event_id: 19
+        message: "Successfully installed updates"
+
+    - name: Send notification email upon success
+      mail:
+        host: smtp.yourserver.com
+        port: 25
+        to: "murad.tamazanov@htl-braunau.at"
+        subject: "Windows Server Update Complete"
+        body: "The playbook has completed successfully. All updates and tasks were applied."
