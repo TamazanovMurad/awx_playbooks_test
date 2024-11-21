@@ -13,10 +13,13 @@
       register: winrm_status
       failed_when: winrm_status.state != "started"
 
-    # Install a list of software packages
-    - name: Install Chocolatey package manager
-      win_chocolatey_facts:
+    # Install Chocolatey package manager
+    - name: Install Chocolatey
+      win_chocolatey:
+        name: chocolatey
+        state: present
     
+    # Install common software using Chocolatey
     - name: Install common software using Chocolatey
       win_chocolatey:
         name: "{{ item }}"
@@ -45,7 +48,6 @@
         localport: 5985
         protocol: TCP
         direction: in
-        localport: 5985
         action: allow
 
     # Set registry values for system optimization
@@ -56,7 +58,7 @@
         data: '1'
         type: string
 
-   # Create scheduled task to clean temp files every day
+    # Create scheduled task to clean temp files every day
     - name: Schedule a task to clean up temp files daily
       win_scheduled_task:
         name: "Clean Temp Files"
