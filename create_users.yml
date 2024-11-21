@@ -2,6 +2,9 @@
 - name: Create users from a file
   hosts: windows
   gather_facts: no
+  vars:
+    user_file: "files/users.txt"  # Standardpfad zur Datei
+
   tasks:
     - name: Read the user file
       win_shell: |
