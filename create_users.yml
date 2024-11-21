@@ -3,9 +3,19 @@
   hosts: windows
   gather_facts: no
   vars:
-    user_file: "files/users.txt"  # Standardpfad zur Datei
+    user_file: "C:\\Temp\\users.txt"  # Zielpfad auf dem Windows-System
 
   tasks:
+    - name: Ensure the Temp directory exists
+      win_file:
+        path: C:\Temp
+        state: directory
+
+    - name: Copy the user file to the Windows host
+      win_copy:
+        src: files/users.txt
+        dest: "{{ user_file }}"
+
     - name: Read the user file
       win_shell: |
         Get-Content {{ user_file }}
