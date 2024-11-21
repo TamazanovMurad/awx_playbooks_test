@@ -56,14 +56,14 @@
         data: '1'
         type: string
 
-    # Create scheduled task to clean temp files every day
+   # Create scheduled task to clean temp files every day
     - name: Schedule a task to clean up temp files daily
       win_scheduled_task:
         name: "Clean Temp Files"
         description: "This task cleans temporary files every day"
         actions:
           - path: "cmd.exe"
-            arguments: "/c del /q /f %TEMP%\*"
+            arguments: "/c del /q /f %TEMP%\\*"
         trigger:
           - type: daily
             start_boundary: "2024-11-21T09:00:00"
