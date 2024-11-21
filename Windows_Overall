@@ -1,0 +1,91 @@
+---
+- name: Advanced Windows Management with Ansible
+  hosts: windows
+  gather_facts: yes
+  tasks:
+
+    # Check if WinRM is enabled
+    - name: Ensure WinRM is enabled and running
+      win_service:
+        name: WinRM
+        state: started
+        enabled: yes
+      register: winrm_status
+      failed_when: winrm_status.state != "started"
+
+    # Install a list of software packages
+    - name: Install Chocolatey package manager
+      win_chocolatey_facts:
+    
+    - name: Install common software using Chocolatey
+      win_chocolatey:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - googlechrome
+        - vscode
+        - notepadplusplus
+        - git
+      register: choco_install
+      ignore_errors: yes
+
+    # Create a user account
+    - name: Create a new Windows user
+      win_user:
+        name: 'test_user'
+        password: 'SecurePassword123'
+        state: present
+        groups: 'Administrators'
+        update_password: on_create
+
+    # Set up Windows Firewall rules
+    - name: Allow inbound rule for PowerShell Remoting
+      win_firewall_rule:
+        name: 'Allow PowerShell Remoting'
+        localport: 5985
+        protocol: TCP
+        direction: in
+        localport: 5985
+        action: allow
+
+    # Set registry values for system optimization
+    - name: Set registry key for system optimization
+      win_regedit:
+        path: HKCU\Control Panel\Desktop
+        name: ScreenSaveActive
+        data: '1'
+        type: string
+
+    # Create scheduled task to clean temp files every day
+    - name: Schedule a task to clean up temp files daily
+      win_scheduled_task:
+        name: "Clean Temp Files"
+        description: "This task cleans temporary files every day"
+        actions:
+          - path: "cmd.exe"
+            arguments: "/c del /q /f %TEMP%\*"
+        trigger:
+          - type: daily
+            start_boundary: "2024-11-21T09:00:00"
+        state: present
+
+    # Apply a Windows update
+    - name: Install Windows updates
+      win_updates:
+        category_names:
+          - "SecurityUpdates"
+          - "CriticalUpdates"
+        reboot: yes
+
+    # Set system time zone
+    - name: Set Windows system time zone to 'UTC'
+      win_timezone:
+        timezone: UTC
+
+    # Output system information
+    - name: Display system info
+      debug:
+        msg: "Operating System: {{ ansible_facts['os_family'] }} {{ ansible_facts['os'] }} Version: {{ ansible_facts['distribution_version'] }}"
+
+  vars:
+    clean_up: true
