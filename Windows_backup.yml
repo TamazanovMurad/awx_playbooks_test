@@ -1,0 +1,38 @@
+---
+- name: Backup Windows PCs to Backup Server
+  hosts: all
+  gather_facts: no
+  vars:
+    backup_server: "\\192.168.100.137\Backup"
+    backup_user: "backupuser"
+    backup_password: "kali"
+    backup_users:
+      - "kali"  # Liste der Benutzernamen auf den PCs
+    backup_archive: "Backup-{{ ansible_hostname }}-{{ ansible_date_time.date }}.zip"
+
+  tasks:
+    - name: Test connectivity
+      win_ping:
+
+    - name: Map network drive to backup server
+      win_shell: |
+        net use Z: {{ backup_server }} /user:{{ backup_user }} {{ backup_password }}
+
+    - name: Compress user directories into ZIP files
+      win_shell: |
+        Compress-Archive -Path "{{ ansible_env.HOMEPATH }}\\*" -DestinationPath "C:\\temp\\{{ backup_archive }}" -Force
+
+    - name: Copy ZIP archive to backup server
+      win_copy:
+        src: "C:\\temp\\{{ backup_archive }}"
+        dest: "Z:\\{{ backup_archive }}"
+
+    - name: Clean up local temp files
+      win_file:
+        path: "C:\\temp\\{{ backup_archive }}"
+        state: absent
+
+    - name: Unmap network drive
+      win_shell: |
+        net use Z: /delete /y
+
