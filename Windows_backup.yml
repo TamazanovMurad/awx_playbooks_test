@@ -17,11 +17,13 @@
         path: C:\\temp
         state: directory
 
+    - name: Map network drive to backup server
+      win_shell: |
+        net use Z: {{ backup_server }} /user:{{ backup_user }} {{ backup_password }}
+
     - name: Compress user directories into ZIP files
       win_shell: |
         Compress-Archive -Path "$env:USERPROFILE\*" -DestinationPath "C:\\temp\\{{ backup_archive }}" -Force
-      args:
-        executable: powershell
 
     - name: Verify ZIP archive exists
       win_stat:
@@ -33,25 +35,18 @@
         msg: "Backup archive was not created!"
       when: not archive_check.stat.exists
 
-    - name: Map network drive to backup server
-      win_shell: |
-        net use Z: {{ backup_server }} /user:{{ backup_user }} {{ backup_password }}
-      register: map_drive
-
     - name: Copy ZIP archive to backup server
-      win_shell: |
-        Copy-Item -Path "C:\\temp\\{{ backup_archive }}" -Destination "Z:\\" -Force
-      args:
-        executable: powershell
-      when: map_drive is succeeded
-
-    - name: Unmap network drive
-      win_shell: |
-        net use Z: /delete /y
-      when: map_drive is succeeded
+      win_copy:
+        src: "C:\\temp\\{{ backup_archive }}"
+        dest: "Z:\\{{ backup_archive }}"
+        remote_src: yes
 
     - name: Clean up local temp files
       win_file:
         path: "C:\\temp\\{{ backup_archive }}"
         state: absent
+
+    - name: Unmap network drive
+      win_shell: |
+        net use Z: /delete /y
 
