@@ -1,13 +1,11 @@
 ---
 - name: Backup Windows PCs to Backup Server
-  hosts: windows
+  hosts: all
   gather_facts: yes
   vars:
-    backup_server: "\\\\192.168.100.137\\Backup"  # Hier wurde der Pfad korrigiert
+    backup_server: "\\\\192.168.100.137\\Backup"
     backup_user: "backupuser"
     backup_password: "kali"
-    backup_users:
-      - "kali"  # Liste der Benutzernamen auf den PCs
     backup_archive: "Backup-{{ ansible_hostname }}-{{ ansible_date_time.date }}.zip"
 
   tasks:
@@ -25,13 +23,23 @@
 
     - name: Compress user directories into ZIP files
       win_shell: |
-        $user_path = $env:USERPROFILE
-        Compress-Archive -Path "$user_path\\*" -DestinationPath "C:\\temp\\{{ backup_archive }}" -Force
+        Compress-Archive -Path "$env:USERPROFILE\*" -DestinationPath "C:\\temp\\{{ backup_archive }}" -Force
+
+    - name: Verify ZIP archive exists
+      win_stat:
+        path: "C:\\temp\\{{ backup_archive }}"
+      register: archive_check
+
+    - name: Fail if ZIP archive is not created
+      fail:
+        msg: "Backup archive was not created!"
+      when: not archive_check.stat.exists
 
     - name: Copy ZIP archive to backup server
       win_copy:
         src: "C:\\temp\\{{ backup_archive }}"
         dest: "Z:\\{{ backup_archive }}"
+        remote_src: yes
 
     - name: Clean up local temp files
       win_file:
