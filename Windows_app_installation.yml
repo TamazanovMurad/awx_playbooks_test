@@ -1,0 +1,45 @@
+---
+- name: Install basic applications using Chocolatey
+  hosts: windows
+  gather_facts: no
+  tasks:
+    - name: Test connectivity to Windows PC
+      win_ping:
+
+    - name: Install Chocolatey
+      win_shell: |
+        Set-ExecutionPolicy Bypass -Scope Process -Force;
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072;
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+      args:
+        executable: powershell.exe
+
+    - name: Verify Chocolatey installation
+      win_command: choco --version
+      register: choco_version
+
+    - name: Output Chocolatey version
+      debug:
+        msg: "Chocolatey version installed: {{ choco_version.stdout }}"
+
+    - name: Install Notepad++
+      win_command: choco install notepadplusplus -y
+
+    - name: Install VLC Media Player
+      win_command: choco install vlc -y
+
+    - name: Install 7-Zip
+      win_command: choco install 7zip -y
+
+    - name: Install Google Chrome
+      win_command: choco install googlechrome -y
+
+    - name: Install Git
+      win_command: choco install git -y
+
+    - name: Install Visual Studio Code
+      win_command: choco install vscode -y
+
+    - name: Output success message
+      debug:
+        msg: "All basic applications have been successfully installed."
