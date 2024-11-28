@@ -20,7 +20,8 @@
 
     - name: Compress user directories into ZIP files
       win_shell: |
-        Compress-Archive -Path "{{ ansible_env.HOMEPATH }}\\*" -DestinationPath "C:\\temp\\{{ backup_archive }}" -Force
+        $user_path = $env:USERPROFILE
+        Compress-Archive -Path "$user_path\\*" -DestinationPath "C:\\temp\\{{ backup_archive }}" -Force
 
     - name: Copy ZIP archive to backup server
       win_copy:
