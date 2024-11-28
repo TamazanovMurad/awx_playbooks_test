@@ -33,15 +33,22 @@
         msg: "Backup archive was not created!"
       when: not archive_check.stat.exists
 
-    - name: Copy ZIP archive to backup server directly
+    - name: Map network drive to backup server
       win_shell: |
-        $User = "{{ backup_user }}"
-        $Password = "{{ backup_password }}"
-        $SecurePassword = ConvertTo-SecureString $Password -AsPlainText -Force
-        $Credential = New-Object System.Management.Automation.PSCredential($User, $SecurePassword)
-        Copy-Item -Path "C:\\temp\\{{ backup_archive }}" -Destination "{{ backup_server }}" -Credential $Credential
+        net use Z: {{ backup_server }} /user:{{ backup_user }} {{ backup_password }}
+      register: map_drive
+
+    - name: Copy ZIP archive to backup server
+      win_shell: |
+        Copy-Item -Path "C:\\temp\\{{ backup_archive }}" -Destination "Z:\\" -Force
       args:
         executable: powershell
+      when: map_drive is succeeded
+
+    - name: Unmap network drive
+      win_shell: |
+        net use Z: /delete /y
+      when: map_drive is succeeded
 
     - name: Clean up local temp files
       win_file:
