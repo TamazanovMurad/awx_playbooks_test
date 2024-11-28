@@ -1,6 +1,6 @@
 ---
 - name: Backup Windows PCs to Backup Server
-  hosts: all
+  hosts: windows
   gather_facts: no
   vars:
     backup_server: "\\192.168.100.137\Backup"
