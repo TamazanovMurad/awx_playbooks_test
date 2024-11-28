@@ -1,9 +1,9 @@
 ---
 - name: Backup Windows PCs to Backup Server
-  hosts: all
+  hosts: windows
   gather_facts: yes
   vars:
-    backup_server: "\\\\192.168.100.137\\Backup"
+    backup_server: "\\\\192.168.100.137\\Backup"  # Netzwerkpfad des Backup-Servers
     backup_user: "backupuser"
     backup_password: "kali"
     backup_archive: "Backup-{{ ansible_hostname }}-{{ ansible_date_time.date }}.zip"
@@ -17,29 +17,20 @@
         path: C:\\temp
         state: directory
 
+    - name: Compress user directories into ZIP files
+      win_shell: |
+        Compress-Archive -Path "C:\\Users\\*" -DestinationPath "C:\\temp\\{{ backup_archive }}" -Force
+      args:
+        executable: powershell
+
     - name: Map network drive to backup server
       win_shell: |
         net use Z: {{ backup_server }} /user:{{ backup_user }} {{ backup_password }}
-
-    - name: Compress user directories into ZIP files
-      win_shell: |
-        Compress-Archive -Path "$env:USERPROFILE\*" -DestinationPath "C:\\temp\\{{ backup_archive }}" -Force
-
-    - name: Verify ZIP archive exists
-      win_stat:
-        path: "C:\\temp\\{{ backup_archive }}"
-      register: archive_check
-
-    - name: Fail if ZIP archive is not created
-      fail:
-        msg: "Backup archive was not created!"
-      when: not archive_check.stat.exists
 
     - name: Copy ZIP archive to backup server
       win_copy:
         src: "C:\\temp\\{{ backup_archive }}"
         dest: "Z:\\{{ backup_archive }}"
-        remote_src: yes
 
     - name: Clean up local temp files
       win_file:
