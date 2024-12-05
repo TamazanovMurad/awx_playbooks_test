@@ -2,6 +2,8 @@
 
 - name: Konfiguriere Restic auf Windows
   hosts: windows
+  collections:
+    - community.crypto
   tasks:
     - name: Erstelle den .ssh-Ordner, falls nicht vorhanden
       ansible.builtin.file:
