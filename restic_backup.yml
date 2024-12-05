@@ -1,5 +1,4 @@
 ---
-
 - name: Konfiguriere Restic auf Windows
   hosts: windows
   collections:
@@ -7,16 +6,18 @@
   tasks:
     - name: Erstelle den .ssh-Ordner, falls nicht vorhanden
       ansible.builtin.file:
-        path: "C:/Benutzer/kali/.ssh"
+        path: "C:/Benutzer/{{ ansible_user }}/.ssh"
         state: directory
         mode: '0700'
 
     - name: Generiere ein SSH-Schlüsselpaar mit PowerShell
       win_shell: |
-        New-Item -Path "C:/Benutzer/kali/.ssh/id_ed25519" -ItemType File -Force
-        ssh-keygen -t ed25519 -f "C:/Benutzer/kali/.ssh/id_ed25519" -N ""
+        if (-not (Test-Path "C:/Benutzer/{{ ansible_user }}/.ssh/id_ed25519")) {
+          New-Item -Path "C:/Benutzer/{{ ansible_user }}/.ssh/id_ed25519" -ItemType File -Force
+          ssh-keygen -t ed25519 -f "C:/Benutzer/{{ ansible_user }}/.ssh/id_ed25519" -N ""
+        }
       args:
-        creates: "C:/Benutzer/kali/.ssh/id_ed25519"
+        creates: "C:/Benutzer/{{ ansible_user }}/.ssh/id_ed25519"
 
     - name: Kopiere den öffentlichen Schlüssel zum Backup-Server
       win_shell: |
@@ -26,15 +27,18 @@
 
     - name: Setze Umgebungsvariable für Restic Passwort
       win_environment:
-        RESTIC_PASSWORD: "kali"
+        name: RESTIC_PASSWORD
+        value: "kali"
 
     - name: Initialisiere das Backup-Repository
-      win_shell: restic -r sftp:rbackup@192.168.100.137:/windows init
+      win_shell: |
+        restic -r sftp:rbackup@192.168.100.137:/windows init
       environment:
         RESTIC_PASSWORD: "kali"
 
     - name: Führe ein Test-Backup durch
-      win_shell: restic -r sftp:rbackup@192.168.100.137:/windows backup C:\ --use-fs-snapshot
+      win_shell: |
+        restic -r sftp:rbackup@192.168.100.137:/windows backup C:\ --use-fs-snapshot
       environment:
         RESTIC_PASSWORD: "kali"
 
