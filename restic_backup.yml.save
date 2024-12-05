@@ -9,12 +9,7 @@
         state: directory
         mode: '0700'
 
-    - name: Generiere ein SSH-Schlüsselpaar
-      ansible.posix.openssh_keypair:
-        path: "C:/Benutzer/kali/.ssh/id_ed25519"
-        type: ed25519
-        comment: "SSH key for Restic"
-
+    
     - name: Kopiere den öffentlichen Schlüssel zum Backup-Server
       win_shell: |
         type C:\Benutzer\{{ ansible_user }}\.ssh\id_ed25519.pub | ssh rbackup@192.168.100.137 "cat >> /home/rbackup/.ssh/authorized_keys"
