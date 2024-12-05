@@ -1,0 +1,20 @@
+---
+- name: Installiere Restic auf Windows
+  hosts: windows
+  gather_facts: false
+  tasks:
+    - name: Überprüfe, ob Chocolatey installiert ist
+      win_shell: choco --version
+      register: choco_installed
+      ignore_errors: true
+
+    - name: Installiere Chocolatey, falls nicht vorhanden
+      win_shell: |
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+      when: choco_installed.rc != 0
+
+    - name: Installiere Restic via Chocolatey
+      win_shell: |
+        choco install -y restic
