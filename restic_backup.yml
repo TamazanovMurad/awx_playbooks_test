@@ -3,10 +3,17 @@
 - name: Konfiguriere Restic auf Windows
   hosts: windows
   tasks:
-    - name: Erstelle das SSH-Schlüsselpaar
-      win_shell: ssh-keygen -t ed25519 -N '' -f C:\Benutzer\{{ ansible_user }}\.ssh\id_ed25519
-      args:
-        creates: C:\Benutzer\{{ ansible_user }}\.ssh\id_ed25519
+    - name: Erstelle den .ssh-Ordner, falls nicht vorhanden
+      ansible.builtin.file:
+        path: "C:/Benutzer/kali/.ssh"
+        state: directory
+        mode: '0700'
+
+    - name: Generiere ein SSH-Schlüsselpaar
+      ansible.builtin.openssh_keypair:
+        path: "C:/Benutzer/kali/.ssh/id_ed25519"
+        type: ed25519
+        comment: "SSH key for Restic"
 
     - name: Kopiere den öffentlichen Schlüssel zum Backup-Server
       win_shell: |
