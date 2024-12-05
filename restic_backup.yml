@@ -11,11 +11,12 @@
         state: directory
         mode: '0700'
 
-    - name: Generiere ein SSH-Schlüsselpaar
-      community.crypto.openssh_keypair:
-        path: "C:/Benutzer/kali/.ssh/id_ed25519"
-        type: ed25519
-        force: true
+    - name: Generiere ein SSH-Schlüsselpaar mit PowerShell
+      win_shell: |
+        New-Item -Path "C:/Benutzer/kali/.ssh/id_ed25519" -ItemType File -Force
+        ssh-keygen -t ed25519 -f "C:/Benutzer/kali/.ssh/id_ed25519" -N ""
+      args:
+        creates: "C:/Benutzer/kali/.ssh/id_ed25519"
 
     - name: Kopiere den öffentlichen Schlüssel zum Backup-Server
       win_shell: |
