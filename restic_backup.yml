@@ -1,0 +1,24 @@
+---
+- name: Konfiguriere Restic auf Windows
+  hosts: windows
+  tasks:
+    - name: Erstelle das SSH-Schlüsselpaar
+      win_shell: ssh-keygen -t ed25519 -N '' -f C:\Benutzer\kali\.ssh\id_ed25519
+      args:
+        creates: C:\Benutzer\kali\.ssh\id_ed25519
+
+    - name: Kopiere den öffentlichen Schlüssel zum Backup-Server
+      win_shell: cat C:\Benutzer\kali\.ssh\id_ed25519.pub | ssh rbackup@192.168.100.137 "cat >> /home/rbackup/.ssh/authorized_keys"
+
+    - name: Setze Umgebungsvariable für Restic Passwort
+      win_shell: $env:RESTIC_PASSWORD = "kali"
+
+    - name: Initialisiere das Backup-Repository
+      win_shell: restic -r sftp:rbackup@192.168.100.137:/windows init
+      environment:
+        RESTIC_PASSWORD: "kali"
+
+    - name: Führe ein Test-Backup durch
+      win_shell: restic -r sftp:rbackup@192.168.100.137:/windows backup C:\ --use-fs-snapshot
+      environment:
+        RESTIC_PASSWORD: "kali"
