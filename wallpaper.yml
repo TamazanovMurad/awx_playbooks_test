@@ -1,3 +1,4 @@
+---
 - name: Dynamic Wallpaper Synchronizer
   hosts: all
   gather_facts: no
@@ -36,7 +37,29 @@
       register: download_response
       failed_when: false
 
-    - name: Apply wallpaper without modification
+    - name: Create and apply wallpaper
       win_shell: |
+        $imagePath = "{{ download_path }}"
+        $quote = "{{ quote_response.json[0].q }}"  # Fehler korrigieren: `quote_response.json[0].q`
+        $weather = "{{ weather_response.json.weather[0].description }}"  # Fehler korrigieren: `weather_response.json.weather[0].description`
+        Add-Type -TypeDefinition @"
+        using System.Drawing;
+        using System.Drawing.Imaging;
+        public class WallpaperGenerator {
+          public static void AddText(string path, string quote, string weather) {
+            using (var bitmap = new Bitmap(path)) {
+              using (Graphics g = Graphics.FromImage(bitmap)) {
+                Font drawFont = new Font("Arial", 16);
+                SolidBrush drawBrush = new SolidBrush(Color.White);
+                g.DrawString($"Quote: {quote}", drawFont, drawBrush, new PointF(10, 10));
+                g.DrawString($"Weather: {weather}", drawFont, drawBrush, new PointF(10, 50));
+                bitmap.Save(path, ImageFormat.Jpeg);
+              }
+            }
+          }
+        }
+        "@
+        [WallpaperGenerator]::AddText($imagePath, $quote, $weather)
         RUNDLL32.EXE user32.dll, UpdatePerUserSystemParameters
       when: download_response is succeeded
+
