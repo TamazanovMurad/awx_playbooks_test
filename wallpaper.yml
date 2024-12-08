@@ -1,7 +1,7 @@
 ---
 - name: Dynamic Wallpaper Synchronizer
   hosts: all
-  gather_facts: no  # Vermeidet Python-Abhängigkeit für die Faktsammlung
+  gather_facts: no
   vars:
     wallpaper_url: "https://imgur.com/z8KCBPz"
     weather_api: "http://api.openweathermap.org/data/2.5/weather"
@@ -23,7 +23,7 @@
 
     - name: Fetch local weather
       win_uri:
-        url: "{{ weather_api }}?q=London&appid={{ api_key }}"  # Ort ggf. anpassen
+        url: "{{ weather_api }}?q=London&appid={{ api_key }}"
         return_content: yes
       register: weather_response
 
