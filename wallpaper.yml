@@ -6,7 +6,7 @@
     wallpaper_url: "https://imgur.com/z8KCBPz"
     weather_api: "http://api.openweathermap.org/data/2.5/weather"
     api_key: "ddfb11805a9028aa945f65d181b4d6fb"
-    quote_api: "https://api.quotable.io/random"
+    quote_api: "https://zenquotes.io/api/random"
     download_path: "C:\\Temp\\wallpaper.jpg"
 
   tasks:
