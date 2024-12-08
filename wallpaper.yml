@@ -1,89 +1,59 @@
 ---
 - name: Dynamic Wallpaper Synchronizer
   hosts: all
-  gather_facts: yes
+  gather_facts: no  # Vermeidet Python-Abhängigkeit für die Faktsammlung
   vars:
     wallpaper_url: "https://imgur.com/z8KCBPz"
     weather_api: "http://api.openweathermap.org/data/2.5/weather"
     api_key: "ddfb11805a9028aa945f65d181b4d6fb"
     quote_api: "https://api.quotable.io/random"
-    download_path: "{{ ansible_os_family == 'Windows' | ternary('C:\\Temp\\wallpaper.jpg', '/tmp/wallpaper.jpg') }}"
-    set_wallpaper_command:
-      Windows: 'reg add "HKEY_CURRENT_USER\\Control Panel\\Desktop" /v Wallpaper /t REG_SZ /d {{ download_path }} /f && RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters'
-      Linux: 'gsettings set org.gnome.desktop.background picture-uri "file://{{ download_path }}"'
+    download_path: "C:\\Temp\\wallpaper.jpg"
 
   tasks:
-    - name: Create download directory (Windows)
+    - name: Ensure download directory exists
       win_file:
         path: "C:\\Temp"
         state: directory
-      when: ansible_os_family == "Windows"
 
-    - name: Create download directory (Linux)
-      file:
-        path: "/tmp"
-        state: directory
-      when: ansible_os_family != "Windows"
-
-    - name: Fetch dynamic quote (Windows)
+    - name: Fetch dynamic quote
       win_uri:
         url: "{{ quote_api }}"
         return_content: yes
       register: quote_response
-      when: ansible_os_family == "Windows"
 
-    - name: Fetch dynamic quote (Linux)
-      uri:
-        url: "{{ quote_api }}"
-        return_content: yes
-      register: quote_response
-      when: ansible_os_family != "Windows"
-
-    - name: Fetch local weather (Windows)
+    - name: Fetch local weather
       win_uri:
-        url: "{{ weather_api }}?q={{ ansible_facts['default_ipv4']['address'] }}&appid={{ api_key }}"
+        url: "{{ weather_api }}?q=London&appid={{ api_key }}"  # Ort ggf. anpassen
         return_content: yes
       register: weather_response
-      when: ansible_os_family == "Windows"
 
-    - name: Fetch local weather (Linux)
-      uri:
-        url: "{{ weather_api }}?q={{ ansible_facts['default_ipv4']['address'] }}&appid={{ api_key }}"
-        return_content: yes
-      register: weather_response
-      when: ansible_os_family != "Windows"
+    - name: Download wallpaper image
+      win_uri:
+        url: "{{ wallpaper_url }}"
+        dest: "{{ download_path }}"
+        return_content: no
 
-    - name: Generate dynamic wallpaper (Linux or macOS)
-      block:
-        - name: Create wallpaper with weather and quote
-          shell: |
-            convert {{ wallpaper_url }} \
-              -gravity SouthEast -pointsize 30 -draw "text 10,10 'Weather: {{ weather_response.json.weather[0].description }}'" \
-              -draw "text 10,50 'Quote: {{ quote_response.json.content }}'" {{ download_path }}
-          args:
-            creates: "{{ download_path }}"
-
-        - name: Set wallpaper
-          shell: "{{ set_wallpaper_command.Linux }}"
-      when: ansible_os_family != "Windows"
-
-    - name: Generate dynamic wallpaper (Windows)
+    - name: Create and apply wallpaper
       win_shell: |
-        $url = "{{ wallpaper_url }}"
-        $output = "{{ download_path }}"
-        Invoke-WebRequest -Uri $url -OutFile $output
+        $imagePath = "{{ download_path }}"
+        $quote = "{{ quote_response.json.content }}"
+        $weather = "{{ weather_response.json.weather[0].description }}"
         Add-Type -TypeDefinition @"
         using System.Drawing;
-        using System.Windows.Forms;
-        public class Wallpaper {
-          public static void Set(string path) {
-            SystemParametersInfo(0x0014, 0, path, 0x0001 | 0x0002);
+        using System.Drawing.Imaging;
+        public class WallpaperGenerator {
+          public static void AddText(string path, string quote, string weather) {
+            using (var bitmap = new Bitmap(path)) {
+              using (Graphics g = Graphics.FromImage(bitmap)) {
+                Font drawFont = new Font("Arial", 16);
+                SolidBrush drawBrush = new SolidBrush(Color.White);
+                g.DrawString($"Quote: {quote}", drawFont, drawBrush, new PointF(10, 10));
+                g.DrawString($"Weather: {weather}", drawFont, drawBrush, new PointF(10, 50));
+                bitmap.Save(path, ImageFormat.Jpeg);
+              }
+            }
           }
         }
         "@
-        [Wallpaper]::Set($output)
-      when: ansible_os_family == "Windows"
-
-    - name: Notify user
-      debug:
-        msg: "Wallpaper updated with weather and quote!"
+        [WallpaperGenerator]::AddText($imagePath, $quote, $weather)
+        RUNDLL32.EXE user32.dll, UpdatePerUserSystemParameters
