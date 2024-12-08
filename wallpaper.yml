@@ -1,0 +1,60 @@
+---
+- name: Dynamic Wallpaper Synchronizer
+  hosts: all
+  gather_facts: yes
+  vars:
+    wallpaper_url: "https://imgur.com/z8KCBPz"
+    weather_api: "http://api.openweathermap.org/data/2.5/weather"
+    api_key: "ddfb11805a9028aa945f65d181b4d6fb"
+    quote_api: "https://api.quotable.io/random"
+    download_path: "{{ ansible_os_family == 'Windows' | ternary('C:\\Temp\\wallpaper.jpg', '/tmp/wallpaper.jpg') }}"
+    set_wallpaper_command:
+      Windows: 'reg add "HKEY_CURRENT_USER\\Control Panel\\Desktop" /v Wallpaper /t REG_SZ /d {{ download_path }} /f && RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters'
+      Linux: 'gsettings set org.gnome.desktop.background picture-uri "file://{{ download_path }}"'
+
+  tasks:
+    - name: Fetch dynamic quote
+      uri:
+        url: "{{ quote_api }}"
+        return_content: yes
+      register: quote_response
+
+    - name: Fetch local weather
+      uri:
+        url: "{{ weather_api }}?q={{ ansible_facts['default_ipv4']['address'] }}&appid={{ api_key }}"
+        return_content: yes
+      register: weather_response
+
+    - name: Generate dynamic wallpaper (Linux or macOS)
+      block:
+        - name: Create wallpaper with weather and quote
+          shell: |
+            convert {{ wallpaper_url }} \
+              -gravity SouthEast -pointsize 30 -draw "text 10,10 'Weather: {{ weather_response.json.weather[0].description }}'" \
+              -draw "text 10,50 'Quote: {{ quote_response.json.content }}'" {{ download_path }}
+          args:
+            creates: "{{ download_path }}"
+
+        - name: Set wallpaper
+          shell: "{{ set_wallpaper_command.Linux }}"
+      when: ansible_os_family != "Windows"
+
+    - name: Generate dynamic wallpaper (Windows)
+      win_shell: |
+        powershell -Command "
+        Invoke-WebRequest -Uri {{ wallpaper_url }} -OutFile {{ download_path }};
+        Add-Type -TypeDefinition @"
+        using System.Drawing;
+        using System.Windows.Forms;
+        public class Wallpaper {
+          public static void Set(string path) {
+            SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, path, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
+          }
+        }
+        "@;
+        Wallpaper::Set('{{ download_path }}');
+        "
+
+    - name: Notify user
+      debug:
+        msg: "Wallpaper updated with weather and quote!"
