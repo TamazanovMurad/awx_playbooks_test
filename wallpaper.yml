@@ -20,24 +20,28 @@
         url: "{{ quote_api }}"
         return_content: yes
       register: quote_response
+      failed_when: false
 
     - name: Fetch local weather
       win_uri:
         url: "{{ weather_api }}?q=London&appid={{ api_key }}"
         return_content: yes
       register: weather_response
+      failed_when: false
 
     - name: Download wallpaper image
       win_uri:
         url: "{{ wallpaper_url }}"
         dest: "{{ download_path }}"
-        return_content: no
+        return_content: yes
+      register: download_response
+      failed_when: false
 
     - name: Create and apply wallpaper
       win_shell: |
         $imagePath = "{{ download_path }}"
-        $quote = "{{ quote_response.json.content }}"
-        $weather = "{{ weather_response.json.weather[0].description }}"
+        $quote = "{{ quote_response.json[0].q }}"  # Fehler korrigieren: `quote_response.json[0].q`
+        $weather = "{{ weather_response.json.weather[0].description }}"  # Fehler korrigieren: `weather_response.json.weather[0].description`
         Add-Type -TypeDefinition @"
         using System.Drawing;
         using System.Drawing.Imaging;
@@ -57,3 +61,5 @@
         "@
         [WallpaperGenerator]::AddText($imagePath, $quote, $weather)
         RUNDLL32.EXE user32.dll, UpdatePerUserSystemParameters
+      when: download_response is succeeded
+
