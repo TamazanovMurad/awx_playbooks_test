@@ -1,67 +1,59 @@
+---
 - name: Dynamic Wallpaper Synchronizer
-  hosts: windows
+  hosts: all
+  gather_facts: no
+  vars:
+    wallpaper_url: "https://imgur.com/z8KCBPz"
+    weather_api: "http://api.openweathermap.org/data/2.5/weather"
+    api_key: "ddfb11805a9028aa945f65d181b4d6fb"
+    quote_api: "https://zenquotes.io/api/random"
+    download_path: "C:\\Temp\\wallpaper.jpg"
+
   tasks:
     - name: Ensure download directory exists
-      file:
-        path: "{{ download_dir }}"
+      win_file:
+        path: "C:\\Temp"
         state: directory
-      become: yes
 
     - name: Fetch dynamic quote
-      uri:
-        url: "https://zenquotes.io/api/random"
+      win_uri:
+        url: "{{ quote_api }}"
         return_content: yes
       register: quote_response
-      become: yes
 
     - name: Fetch local weather
-      uri:
-        url: "{{ weather_api }}?q={{ ansible_facts.default_ipv4.address }}&appid={{ api_key }}"
+      win_uri:
+        url: "{{ weather_api }}?q=London&appid={{ api_key }}"
         return_content: yes
       register: weather_response
-      become: yes
 
     - name: Download wallpaper image
-      uri:
+      win_uri:
         url: "{{ wallpaper_url }}"
-        dest: "{{ download_dir }}/wallpaper.jpg"
-      register: wallpaper_download
-      become: yes
-      when: quote_response.status_code == 200 and weather_response.status_code == 200
+        dest: "{{ download_path }}"
+        return_content: no
 
     - name: Create and apply wallpaper
-      shell: |
-        convert {{ download_dir }}/wallpaper.jpg \
-        -gravity SouthEast -pointsize 30 -draw "text 10,10 'Weather: {{ weather_response.json.weather[0].description }}'" \
-        -draw "text 10,50 'Quote: {{ quote_response.json[0].q }}'" {{ download_dir }}/final_wallpaper.jpg
-        powershell -Command "Add-Type -TypeDefinition '@
-          using System.Drawing;
-          using System.Windows.Forms;
-          public class Wallpaper {
-            public static void Set(string path) {
-              SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, path, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
-            }
-          }
-        '@; Wallpaper::Set('{{ download_dir }}/final_wallpaper.jpg');"
-      args:
-        creates: "{{ download_dir }}/final_wallpaper.jpg"
-      when: ansible_os_family != "Windows"
-
-    - name: Apply wallpaper on Windows
       win_shell: |
-        powershell -Command "
-        Invoke-WebRequest -Uri {{ wallpaper_url }} -OutFile {{ download_dir }}/wallpaper.jpg;
-        Add-Type -TypeDefinition '@
-          using System.Drawing;
-          using System.Windows.Forms;
-          public class Wallpaper {
-            public static void Set(string path) {
-              SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, path, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
+        $imagePath = "{{ download_path }}"
+        $quote = "{{ quote_response.json.content }}"
+        $weather = "{{ weather_response.json.weather[0].description }}"
+        Add-Type -TypeDefinition @"
+        using System.Drawing;
+        using System.Drawing.Imaging;
+        public class WallpaperGenerator {
+          public static void AddText(string path, string quote, string weather) {
+            using (var bitmap = new Bitmap(path)) {
+              using (Graphics g = Graphics.FromImage(bitmap)) {
+                Font drawFont = new Font("Arial", 16);
+                SolidBrush drawBrush = new SolidBrush(Color.White);
+                g.DrawString($"Quote: {quote}", drawFont, drawBrush, new PointF(10, 10));
+                g.DrawString($"Weather: {weather}", drawFont, drawBrush, new PointF(10, 50));
+                bitmap.Save(path, ImageFormat.Jpeg);
+              }
             }
           }
-        '@;
-        Wallpaper::Set('{{ download_dir }}/wallpaper.jpg');
-        "
-      args:
-        creates: "{{ download_dir }}/wallpaper.jpg"
-      when: ansible_os_family == "Windows"
+        }
+        "@
+        [WallpaperGenerator]::AddText($imagePath, $quote, $weather)
+        RUNDLL32.EXE user32.dll, UpdatePerUserSystemParameters
