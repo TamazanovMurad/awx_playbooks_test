@@ -13,17 +13,45 @@
       Linux: 'gsettings set org.gnome.desktop.background picture-uri "file://{{ download_path }}"'
 
   tasks:
-    - name: Fetch dynamic quote
+    - name: Create download directory (Windows)
+      win_file:
+        path: "C:\\Temp"
+        state: directory
+      when: ansible_os_family == "Windows"
+
+    - name: Create download directory (Linux)
+      file:
+        path: "/tmp"
+        state: directory
+      when: ansible_os_family != "Windows"
+
+    - name: Fetch dynamic quote (Windows)
+      win_uri:
+        url: "{{ quote_api }}"
+        return_content: yes
+      register: quote_response
+      when: ansible_os_family == "Windows"
+
+    - name: Fetch dynamic quote (Linux)
       uri:
         url: "{{ quote_api }}"
         return_content: yes
       register: quote_response
+      when: ansible_os_family != "Windows"
 
-    - name: Fetch local weather
+    - name: Fetch local weather (Windows)
+      win_uri:
+        url: "{{ weather_api }}?q={{ ansible_facts['default_ipv4']['address'] }}&appid={{ api_key }}"
+        return_content: yes
+      register: weather_response
+      when: ansible_os_family == "Windows"
+
+    - name: Fetch local weather (Linux)
       uri:
         url: "{{ weather_api }}?q={{ ansible_facts['default_ipv4']['address'] }}&appid={{ api_key }}"
         return_content: yes
       register: weather_response
+      when: ansible_os_family != "Windows"
 
     - name: Generate dynamic wallpaper (Linux or macOS)
       block:
@@ -41,19 +69,20 @@
 
     - name: Generate dynamic wallpaper (Windows)
       win_shell: |
-        powershell -Command "
-        Invoke-WebRequest -Uri {{ wallpaper_url }} -OutFile {{ download_path }};
+        $url = "{{ wallpaper_url }}"
+        $output = "{{ download_path }}"
+        Invoke-WebRequest -Uri $url -OutFile $output
         Add-Type -TypeDefinition @"
         using System.Drawing;
         using System.Windows.Forms;
         public class Wallpaper {
           public static void Set(string path) {
-            SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, path, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
+            SystemParametersInfo(0x0014, 0, path, 0x0001 | 0x0002);
           }
         }
-        "@;
-        Wallpaper::Set('{{ download_path }}');
-        "
+        "@
+        [Wallpaper]::Set($output)
+      when: ansible_os_family == "Windows"
 
     - name: Notify user
       debug:
