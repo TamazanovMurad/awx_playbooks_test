@@ -50,7 +50,14 @@
         "{{ final_wallpaper_path }}"
       when: quote_response.status == 200 and weather_response.status == 200
 
+    - name: Gather all facts including desktop environment
+      ansible.builtin.setup:
+
+    - name: Debug desktop environment
+      debug:
+        msg: "{{ ansible_facts }}"
+
     - name: Apply the wallpaper
       shell: |
         gsettings set org.gnome.desktop.background picture-uri "file://{{ final_wallpaper_path }}"
-      when: ansible_facts['desktop_environment'] == "gnome"
+      when: ansible_facts['ansible_desktop_environment'] == "gnome"
