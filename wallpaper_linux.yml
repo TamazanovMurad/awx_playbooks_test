@@ -2,7 +2,7 @@
   hosts: kali
   gather_facts: yes
   vars:
-    wallpaper_url: "https://i.imgur.com/z8KCBPz.jpg"
+    wallpaper_url: "https://de.m.wiktionary.org/wiki/Datei:Basement_of_Lawang_Sewu_2011.JPG"
     weather_api: "http://api.openweathermap.org/data/2.5/weather"
     api_key: "ddfb11805a9028aa945f65d181b4d6fb"
     quote_api: "https://zenquotes.io/api/random"
