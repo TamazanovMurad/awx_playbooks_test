@@ -2,7 +2,7 @@
   hosts: kali
   gather_facts: yes
   vars:
-    wallpaper_url: "https://imgur.com/z8KCBPz"
+    wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
     weather_api: "http://api.openweathermap.org/data/2.5/weather"
     api_key: "ddfb11805a9028aa945f65d181b4d6fb"
     quote_api: "https://zenquotes.io/api/random"
