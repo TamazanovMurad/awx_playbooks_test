@@ -1,0 +1,50 @@
+---
+- name: Dynamic Wallpaper Synchronizer for Linux
+  hosts: kali
+  gather_facts: yes
+  vars:
+    wallpaper_url: "https://imgur.com/z8KCBPz"
+    weather_api: "http://api.openweathermap.org/data/2.5/weather"
+    api_key: "ddfb11805a9028aa945f65d181b4d6fb"
+    quote_api: "https://zenquotes.io/api/random"
+    download_path: "/tmp/wallpaper.jpg"
+    final_wallpaper_path: "/usr/share/backgrounds/wallpaper.jpg"
+
+  tasks:
+    - name: Ensure download directory exists
+      file:
+        path: "/tmp"
+        state: directory
+
+    - name: Fetch dynamic quote
+      uri:
+        url: "{{ quote_api }}"
+        return_content: yes
+      register: quote_response
+      failed_when: false
+
+    - name: Fetch local weather
+      uri:
+        url: "{{ weather_api }}?q=London&appid={{ api_key }}"
+        return_content: yes
+      register: weather_response
+      failed_when: false
+
+    - name: Download wallpaper image
+      get_url:
+        url: "{{ wallpaper_url }}"
+        dest: "{{ download_path }}"
+        mode: '0644'
+
+    - name: Overlay quote and weather on the wallpaper
+      command: >
+        convert "{{ download_path }}"
+        -pointsize 20 -fill white -annotate +10+20 "Quote: {{ quote_response.json[0].q }}"
+        -pointsize 20 -fill white -annotate +10+50 "Weather: {{ weather_response.json.weather[0].description }}"
+        "{{ final_wallpaper_path }}"
+      when: quote_response is succeeded and weather_response is succeeded
+
+    - name: Apply the wallpaper
+      shell: |
+        gsettings set org.gnome.desktop.background picture-uri "file://{{ final_wallpaper_path }}"
+      when: ansible_facts['desktop_environment'] == "gnome"
