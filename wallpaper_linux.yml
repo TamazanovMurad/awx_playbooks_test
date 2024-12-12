@@ -22,6 +22,10 @@
       register: quote_response
       failed_when: false
 
+    - name: Debug quote response
+      debug:
+        var: quote_response
+
     - name: Fetch local weather
       uri:
         url: "{{ weather_api }}?q=London&appid={{ api_key }}"
@@ -41,7 +45,7 @@
     - name: Overlay quote and weather on the wallpaper
       command: >
         convert "{{ download_path }}"
-        -pointsize 20 -fill white -annotate +10+20 "Quote: {{ quote_response.json[0].q }}"
+        -pointsize 20 -fill white -annotate +10+20 "Quote: {{ quote_response.json[0]['q'] }}"
         -pointsize 20 -fill white -annotate +10+50 "Weather: {{ weather_response.json.weather[0].description }}"
         "{{ final_wallpaper_path }}"
       when: quote_response.status == 200 and weather_response.status == 200
