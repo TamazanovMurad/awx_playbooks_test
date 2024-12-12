@@ -31,7 +31,6 @@
 
     - name: Download wallpaper image
       command: wget -O "{{ download_path }}" "{{ wallpaper_url }}"
-      mode: '0644'
       ignore_errors: yes
 
     - name: Verify downloaded image file
