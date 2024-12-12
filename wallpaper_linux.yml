@@ -42,6 +42,18 @@
       register: verify_image
       failed_when: "'image data' not in verify_image.stdout"
 
+    - name: Debug converted command
+      command: >
+        echo convert "{{ download_path }}"
+        -pointsize 20 -fill white -annotate +10+20 "Quote: {{ quote_response.json[0]['q'] }}"
+        -pointsize 20 -fill white -annotate +10+50 "Weather: {{ weather_response.json.weather[0].description }}"
+        "{{ final_wallpaper_path }}"
+      register: convert_command
+
+    - name: Print converted command
+      debug:
+        var: convert_command
+
     - name: Overlay quote and weather on the wallpaper
       command: >
         convert "{{ download_path }}"
@@ -50,14 +62,7 @@
         "{{ final_wallpaper_path }}"
       when: quote_response.status == 200 and weather_response.status == 200
 
-    - name: Gather all facts including desktop environment
-      ansible.builtin.setup:
-
-    - name: Debug desktop environment
-      debug:
-        msg: "{{ ansible_facts }}"
-
     - name: Apply the wallpaper
       shell: |
         gsettings set org.gnome.desktop.background picture-uri "file://{{ final_wallpaper_path }}"
-      when: ansible_facts['ansible_desktop_environment'] == "gnome"
+      ignore_errors: yes
