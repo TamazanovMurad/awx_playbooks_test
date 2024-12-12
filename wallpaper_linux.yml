@@ -1,9 +1,8 @@
----
 - name: Dynamic Wallpaper Synchronizer for Linux
   hosts: kali
   gather_facts: yes
   vars:
-    wallpaper_url: "https://de.m.wikipedia.org/wiki/Datei:Lahntalbr%C3%BCcke_relikt.JPG"
+    wallpaper_url: "https://i.imgur.com/z8KCBPz.jpg"
     weather_api: "http://api.openweathermap.org/data/2.5/weather"
     api_key: "ddfb11805a9028aa945f65d181b4d6fb"
     quote_api: "https://zenquotes.io/api/random"
@@ -31,10 +30,14 @@
       failed_when: false
 
     - name: Download wallpaper image
-      get_url:
-        url: "{{ wallpaper_url }}"
-        dest: "{{ download_path }}"
-        mode: '0644'
+      command: wget -O "{{ download_path }}" "{{ wallpaper_url }}"
+      mode: '0644'
+      ignore_errors: yes
+
+    - name: Verify downloaded image file
+      shell: file "{{ download_path }}"
+      register: verify_image
+      failed_when: "'image data' not in verify_image.stdout"
 
     - name: Overlay quote and weather on the wallpaper
       command: >
