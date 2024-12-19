@@ -1,5 +1,5 @@
 ---
 
 collections:
-  - name: community.general
-    source: galaxy
+  - name: community.snapd
+    source: https://galaxy.ansible.com/ansible-collections/community/snapd
