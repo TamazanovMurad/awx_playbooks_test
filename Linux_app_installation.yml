@@ -40,14 +40,6 @@
         state: latest
       when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
 
-    - name: Install Google Chrome
-      snap:
-        name: google-chrome
-        state: present
-      become: yes
-      retries: 3
-      delay: 5
-
     - name: Install Visual Studio Code
       snap:
         name: code
