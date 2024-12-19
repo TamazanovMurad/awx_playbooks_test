@@ -15,6 +15,8 @@
       become: yes
       register: snapd_installed
       failed_when: snapd_installed.changed
+      retries: 3
+      delay: 5
 
     - name: Install snapd (if not installed)
       yum:
@@ -24,6 +26,8 @@
       become: yes
       register: snapd_installed
       failed_when: snapd_installed.changed
+      retries: 3
+      delay: 5
 
     - name: Update package lists (Debian-based systems)
       apt:
@@ -40,21 +44,33 @@
       snap:
         name: google-chrome
         state: present
+      become: yes
+      retries: 3
+      delay: 5
 
     - name: Install Visual Studio Code
       snap:
         name: code
         state: present
+      become: yes
+      retries: 3
+      delay: 5
 
     - name: Install VLC Media Player
       snap:
         name: vlc
         state: present
+      become: yes
+      retries: 3
+      delay: 5
 
     - name: Install Skype
       snap:
         name: skype
         state: present
+      become: yes
+      retries: 3
+      delay: 5
 
     - name: Output success message
       debug:
