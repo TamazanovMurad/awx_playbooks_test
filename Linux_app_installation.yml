@@ -1,6 +1,6 @@
 ---
 - name: Install basic applications on Linux
-  hosts: Lin-1
+  hosts: linux
   become: yes
   tasks:
     - name: Test connectivity to Linux machine
@@ -28,6 +28,8 @@
         - vim
         - htop
         - unzip
+        - google-chrome-stable
+        - code # Visual Studio Code
       when: ansible_distribution in ['Ubuntu', 'Debian']
 
     - name: Install basic applications (RedHat-based)
@@ -41,17 +43,9 @@
         - vim
         - htop
         - unzip
+        - google-chrome-stable
+        - code # Visual Studio Code
       when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
-
-    - name: Install additional tools using Snap (if available)
-      snap:
-        name: "{{ item }}"
-        state: present
-      loop:
-        - vlc
-        - code
-        - chromium
-      when: "'snap' in ansible_facts.packages"
 
     - name: Verify Git installation
       command: git --version
