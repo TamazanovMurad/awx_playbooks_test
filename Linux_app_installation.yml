@@ -1,5 +1,5 @@
 ---
-- name: Install basic applications on Linux
+- name: Install specific applications on Linux
   hosts: linux
   become: yes
   tasks:
@@ -17,34 +17,46 @@
         state: latest
       when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
 
-    - name: Install basic applications (Debian-based)
+    - name: Install Google Chrome (Debian-based)
       apt:
-        name: "{{ item }}"
+        name: google-chrome-stable
         state: present
-      loop:
-        - curl
-        - wget
-        - git
-        - vim
-        - htop
-        - unzip
-        - google-chrome-stable
-        - code # Visual Studio Code
       when: ansible_distribution in ['Ubuntu', 'Debian']
 
-    - name: Install basic applications (RedHat-based)
-      yum:
-        name: "{{ item }}"
+    - name: Install Visual Studio Code (Debian-based)
+      apt:
+        name: code
         state: present
+      when: ansible_distribution in ['Ubuntu', 'Debian']
+
+    - name: Install Google Chrome (RedHat-based)
+      yum:
+        name: google-chrome-stable
+        state: present
+      when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
+
+    - name: Install Visual Studio Code (RedHat-based)
+      yum:
+        name: code
+        state: present
+      when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
+
+    - name: Install additional tools using Snap (if available)
+      snap:
+        name: "{{ item }}"
       loop:
-        - curl
-        - wget
-        - git
-        - vim
-        - htop
-        - unzip
-        - google-chrome-stable
-        - code # Visual Studio Code
+        - vlc
+        - gimp
+        - slack
+      when: ansible_distribution in ['Ubuntu', 'Debian']
+
+    - name: Install additional tools using Snap (if available)
+      snap:
+        name: "{{ item }}"
+      loop:
+        - vlc
+        - gimp
+        - slack
       when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
 
     - name: Verify Git installation
@@ -57,4 +69,4 @@
 
     - name: Output success message
       debug:
-        msg: "All basic applications have been successfully installed."
+        msg: "All specified applications have been successfully installed."
