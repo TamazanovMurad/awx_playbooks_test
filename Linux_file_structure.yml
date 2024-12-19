@@ -1,0 +1,30 @@
+---
+- name: Erstelle grundlegende Dateistruktur
+  hosts: Lin-1
+  become: yes
+  tasks:
+    - name: Erstelle Hauptverzeichnis
+      file:
+        path: /home/{{ ansible_user }}/basic_structure
+        state: directory
+        mode: '0755'
+
+    - name: Erstelle Unterverzeichnisse
+      file:
+        path: "/home/{{ ansible_user }}/basic_structure/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - docs
+        - scripts
+        - logs
+
+    - name: Erstelle Beispieldateien
+      copy:
+        content: "{{ item.content }}"
+        dest: "/home/{{ ansible_user }}/basic_structure/{{ item.name }}"
+        mode: '0644'
+      loop:
+        - { name: 'README.txt', content: 'Dies ist eine README-Datei.' }
+        - { name: 'docs/guide.txt', content: 'Dies ist eine Dokumentationsdatei.' }
+        - { name: 'scripts/install.sh', content: '#!/bin/bash\necho "Installation gestartet..."' }
