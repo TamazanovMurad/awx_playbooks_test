@@ -6,6 +6,24 @@
     - name: Test connectivity to Linux machine
       ping:
 
+    - name: Install snapd (if not installed)
+      apt:
+        name: snapd
+        state: present
+      when: ansible_os_family == 'Debian'
+      become: yes
+      register: snapd_installed
+      failed_when: snapd_installed is changed
+
+    - name: Install snapd (if not installed)
+      yum:
+        name: snapd
+        state: present
+      when: ansible_os_family in ['RedHat', 'CentOS', 'Fedora']
+      become: yes
+      register: snapd_installed
+      failed_when: snapd_installed is changed
+
     - name: Update package lists (Debian-based systems)
       apt:
         update_cache: yes
@@ -18,33 +36,27 @@
       when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
 
     - name: Install Snap applications
-  hosts: all
-  tasks:
-    - name: Install Google Chrome
-      snap:
-        name: google-chrome
-        state: present
+      tasks:
+        - name: Install Google Chrome
+          snap:
+            name: google-chrome
+            state: present
 
-    - name: Install Visual Studio Code
-      snap:
-        name: code
-        state: present
+        - name: Install Visual Studio Code
+          snap:
+            name: code
+            state: present
 
-    - name: Install VLC Media Player
-      snap:
-        name: vlc
-        state: present
+        - name: Install VLC Media Player
+          snap:
+            name: vlc
+            state: present
 
-    - name: Install Skype
-      snap:
-        name: skype
-        state: present
+        - name: Install Skype
+          snap:
+            name: skype
+            state: present
 
     - name: Output success message
       debug:
         msg: "Snap applications have been successfully installed."
-
-
-    - name: Output success message
-      debug:
-        msg: "All specified applications have been successfully installed."
