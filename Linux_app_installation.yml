@@ -60,3 +60,7 @@
     - name: Output success message
       debug:
         msg: "Snap applications have been successfully installed."
+
+    - name: Output success message
+      debug:
+        msg: "All specified applications have been successfully installed."
