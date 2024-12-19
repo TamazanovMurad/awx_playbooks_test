@@ -20,26 +20,16 @@
       when: ansible_os_family in ['RedHat', 'CentOS', 'Fedora']
 
     - name: Add Flathub repository
-      shell: |
-        flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+      command: flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
     - name: Install Visual Studio Code via Flatpak
-      shell: |
-        flatpak install -y flathub com.visualstudio.code
-      args:
-        warn: false
+      command: flatpak install -y flathub com.visualstudio.code
 
     - name: Install VLC Media Player via Flatpak
-      shell: |
-        flatpak install -y flathub org.videolan.VLC
-      args:
-        warn: false
+      command: flatpak install -y flathub org.videolan.VLC
 
     - name: Install Skype via Flatpak
-      shell: |
-        flatpak install -y flathub com.skype.Client
-      args:
-        warn: false
+      command: flatpak install -y flathub com.skype.Client
 
     - name: Output success message
       debug:
