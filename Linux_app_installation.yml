@@ -13,7 +13,7 @@
       when: ansible_os_family == 'Debian'
       become: yes
       register: snapd_installed
-      failed_when: snapd_installed is changed
+      failed_when: snapd_installed.changed
 
     - name: Install snapd (if not installed)
       yum:
@@ -22,7 +22,7 @@
       when: ansible_os_family in ['RedHat', 'CentOS', 'Fedora']
       become: yes
       register: snapd_installed
-      failed_when: snapd_installed is changed
+      failed_when: snapd_installed.changed
 
     - name: Update package lists (Debian-based systems)
       apt:
@@ -35,27 +35,25 @@
         state: latest
       when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
 
-    - name: Install Snap applications
-      tasks:
-        - name: Install Google Chrome
-          snap:
-            name: google-chrome
-            state: present
+    - name: Install Google Chrome
+      snap:
+        name: google-chrome
+        state: present
 
-        - name: Install Visual Studio Code
-          snap:
-            name: code
-            state: present
+    - name: Install Visual Studio Code
+      snap:
+        name: code
+        state: present
 
-        - name: Install VLC Media Player
-          snap:
-            name: vlc
-            state: present
+    - name: Install VLC Media Player
+      snap:
+        name: vlc
+        state: present
 
-        - name: Install Skype
-          snap:
-            name: skype
-            state: present
+    - name: Install Skype
+      snap:
+        name: skype
+        state: present
 
     - name: Output success message
       debug:
