@@ -10,6 +10,7 @@
       apt:
         name: snapd
         state: present
+        update_cache: no
       when: ansible_os_family == 'Debian'
       become: yes
       register: snapd_installed
