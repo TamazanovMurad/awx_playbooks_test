@@ -6,68 +6,41 @@
     - name: Test connectivity to Linux machine
       ping:
 
-    - name: Install snapd (if not installed)
+    - name: Install Flatpak (Debian-based systems)
       apt:
-        name: snapd
+        name: flatpak
         state: present
-        update_cache: no
+        update_cache: yes
       when: ansible_os_family == 'Debian'
-      become: yes
-      register: snapd_installed
-      failed_when: snapd_installed.changed
-      retries: 3
-      delay: 5
 
-    - name: Install snapd (if not installed)
+    - name: Install Flatpak (RedHat-based systems)
       yum:
-        name: snapd
+        name: flatpak
         state: present
       when: ansible_os_family in ['RedHat', 'CentOS', 'Fedora']
-      become: yes
-      register: snapd_installed
-      failed_when: snapd_installed.changed
-      retries: 3
-      delay: 5
 
-    - name: Update package lists (Debian-based systems)
-      apt:
-        update_cache: yes
-      when: ansible_distribution in ['Ubuntu', 'Debian']
+    - name: Add Flathub repository
+      shell: |
+        flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
-    - name: Update package lists (RedHat-based systems)
-      yum:
-        name: "*"
-        state: latest
-      when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
+    - name: Install Visual Studio Code via Flatpak
+      shell: |
+        flatpak install -y flathub com.visualstudio.code
+      args:
+        warn: false
 
-    - name: Install Visual Studio Code
-      snap:
-        name: code
-        state: present
-      become: yes
-      retries: 3
-      delay: 5
+    - name: Install VLC Media Player via Flatpak
+      shell: |
+        flatpak install -y flathub org.videolan.VLC
+      args:
+        warn: false
 
-    - name: Install VLC Media Player
-      snap:
-        name: vlc
-        state: present
-      become: yes
-      retries: 3
-      delay: 5
-
-    - name: Install Skype
-      snap:
-        name: skype
-        state: present
-      become: yes
-      retries: 3
-      delay: 5
+    - name: Install Skype via Flatpak
+      shell: |
+        flatpak install -y flathub com.skype.Client
+      args:
+        warn: false
 
     - name: Output success message
       debug:
-        msg: "Snap applications have been successfully installed."
-
-    - name: Output success message
-      debug:
-        msg: "All specified applications have been successfully installed."
+        msg: "All specified applications have been successfully installed via Flatpak."
