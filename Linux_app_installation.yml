@@ -17,55 +17,33 @@
         state: latest
       when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
 
-    - name: Install Google Chrome (Debian-based)
-      apt:
-        name: google-chrome-stable
+    - name: Install Snap applications
+  hosts: all
+  tasks:
+    - name: Install Google Chrome
+      snap:
+        name: google-chrome
         state: present
-      when: ansible_distribution in ['Ubuntu', 'Debian']
 
-    - name: Install Visual Studio Code (Debian-based)
-      apt:
+    - name: Install Visual Studio Code
+      snap:
         name: code
         state: present
-      when: ansible_distribution in ['Ubuntu', 'Debian']
 
-    - name: Install Google Chrome (RedHat-based)
-      yum:
-        name: google-chrome-stable
-        state: present
-      when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
-
-    - name: Install Visual Studio Code (RedHat-based)
-      yum:
-        name: code
-        state: present
-      when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
-
-    - name: Install additional tools using Snap (if available)
+    - name: Install VLC Media Player
       snap:
-        name: "{{ item }}"
-      loop:
-        - vlc
-        - gimp
-        - slack
-      when: ansible_distribution in ['Ubuntu', 'Debian']
+        name: vlc
+        state: present
 
-    - name: Install additional tools using Snap (if available)
+    - name: Install Skype
       snap:
-        name: "{{ item }}"
-      loop:
-        - vlc
-        - gimp
-        - slack
-      when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
+        name: skype
+        state: present
 
-    - name: Verify Git installation
-      command: git --version
-      register: git_version
-
-    - name: Output Git version
+    - name: Output success message
       debug:
-        msg: "Git version installed: {{ git_version.stdout }}"
+        msg: "Snap applications have been successfully installed."
+
 
     - name: Output success message
       debug:
