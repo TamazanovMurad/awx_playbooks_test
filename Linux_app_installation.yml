@@ -1,0 +1,66 @@
+---
+- name: Install basic applications on Linux
+  hosts: Lin-1
+  become: yes
+  tasks:
+    - name: Test connectivity to Linux machine
+      ping:
+
+    - name: Update package lists (Debian-based systems)
+      apt:
+        update_cache: yes
+      when: ansible_distribution in ['Ubuntu', 'Debian']
+
+    - name: Update package lists (RedHat-based systems)
+      yum:
+        name: "*"
+        state: latest
+      when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
+
+    - name: Install basic applications (Debian-based)
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - wget
+        - git
+        - vim
+        - htop
+        - unzip
+      when: ansible_distribution in ['Ubuntu', 'Debian']
+
+    - name: Install basic applications (RedHat-based)
+      yum:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - wget
+        - git
+        - vim
+        - htop
+        - unzip
+      when: ansible_distribution in ['RedHat', 'CentOS', 'Fedora']
+
+    - name: Install additional tools using Snap (if available)
+      snap:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - vlc
+        - code
+        - chromium
+      when: "'snap' in ansible_facts.packages"
+
+    - name: Verify Git installation
+      command: git --version
+      register: git_version
+
+    - name: Output Git version
+      debug:
+        msg: "Git version installed: {{ git_version.stdout }}"
+
+    - name: Output success message
+      debug:
+        msg: "All basic applications have been successfully installed."
