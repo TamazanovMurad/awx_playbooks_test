@@ -1,10 +1,8 @@
-- name: Dynamic Wallpaper Synchronizer for Linux
+- name: Dynamic Wallpaper with Quote
   hosts: linux
   gather_facts: yes
   vars:
     wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-    weather_api: "http://api.openweathermap.org/data/2.5/weather"
-    api_key: "ddfb11805a9028aa945f65d181b4d6fb"
     quote_api: "https://zenquotes.io/api/random"
     download_path: "/tmp/wallpaper.jpg"
     final_wallpaper_path: "/usr/share/backgrounds/wallpaper.jpg"
@@ -26,13 +24,6 @@
       debug:
         var: quote_response
 
-    - name: Fetch local weather
-      uri:
-        url: "{{ weather_api }}?q=London&appid={{ api_key }}"
-        return_content: yes
-      register: weather_response
-      failed_when: false
-
     - name: Download wallpaper image
       command: wget -O "{{ download_path }}" "{{ wallpaper_url }}"
       ignore_errors: yes
@@ -42,25 +33,12 @@
       register: verify_image
       failed_when: "'image data' not in verify_image.stdout"
 
-    - name: Debug converted command
-      command: >
-        echo convert "{{ download_path }}"
-        -pointsize 20 -fill white -annotate +10+20 "Quote: {{ quote_response.json[0]['q'] }}"
-        -pointsize 20 -fill white -annotate +10+50 "Weather: {{ weather_response.json.weather[0].description }}"
-        "{{ final_wallpaper_path }}"
-      register: convert_command
-
-    - name: Print converted command
-      debug:
-        var: convert_command
-
-    - name: Overlay quote and weather on the wallpaper
+    - name: Overlay quote on the wallpaper
       command: >
         convert "{{ download_path }}"
         -pointsize 20 -fill white -annotate +10+20 "Quote: {{ quote_response.json[0]['q'] }}"
-        -pointsize 20 -fill white -annotate +10+50 "Weather: {{ weather_response.json.weather[0].description }}"
         "{{ final_wallpaper_path }}"
-      when: quote_response.status == 200 and weather_response.status == 200
+      when: quote_response.status == 200
 
     - name: Apply the wallpaper
       shell: |
