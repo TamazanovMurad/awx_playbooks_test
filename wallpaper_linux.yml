@@ -36,8 +36,9 @@
     - name: Overlay quote on the wallpaper
       command: >
         convert "{{ download_path }}"
-        -pointsize 40 -fill black -annotate +50+50 "Quote: {{ quote_response.json[0]['q'] | default('No quote available') }}"
-        "{{ final_wallpaper_path }}"
+        -gravity south
+        -background '#0008' -fill white -pointsize 30 -size x70 caption:"{{ quote_response.json[0]['q'] | default('No quote available') }}"
+        +swap -gravity south -composite "{{ final_wallpaper_path }}"
       when: quote_response.status == 200
 
     - name: Apply the wallpaper
