@@ -3,61 +3,66 @@
   gather_facts: yes
   vars:
     wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fA%3D%3D"
-    weather_api: "http://api.openweathermap.org/data/2.5/weather?q=London&appid=ddfb11805a9028aa945f65d181b4d6fb"
+    weather_api: "http://api.openweathermap.org/data/2.5/weather"
+    api_key: "ddfb11805a9028aa945f65d181b4d6fb"
     quote_api: "https://zenquotes.io/api/random"
     download_path: "/tmp/wallpaper.jpg"
     final_wallpaper_path: "/usr/share/backgrounds/wallpaper.jpg"
-    user_name: "kali"  # Ändere das zu deinem Benutzernamen!
 
   tasks:
     - name: Install required system packages
-      package:
-        name:
+      ansible.builtin.apt:
+        name: 
           - imagemagick
-          - python3-pillow
           - dconf-cli
-          - python3-gi  # Falls `community.general.dconf` genutzt wird
         state: present
+      become: yes
 
-    - name: Ensure the wallpaper directory exists
-      file:
+    - name: Debug Environment Variables
+      debug:
+        var: ansible_facts.env
+
+    - name: Ensure wallpaper directory exists
+      ansible.builtin.file:
         path: "/usr/share/backgrounds"
         state: directory
-        mode: '0755'
+        mode: "0755"
+      become: yes
 
     - name: Download wallpaper image
-      get_url:
+      ansible.builtin.get_url:
         url: "{{ wallpaper_url }}"
         dest: "{{ download_path }}"
-        mode: '0644'
+        mode: "0644"
 
     - name: Fetch dynamic quote
-      uri:
+      ansible.builtin.uri:
         url: "{{ quote_api }}"
         return_content: yes
       register: quote_response
-      failed_when: quote_response.status != 200
-
-    - name: Fetch local weather
-      uri:
-        url: "{{ weather_api }}"
-        return_content: yes
-      register: weather_response
-      failed_when: weather_response.status != 200
-
-    - name: Extract weather description
-      set_fact:
-        weather_text: "{{ weather_response.json.weather[0].description | default('Unknown weather') }}"
+      failed_when: false
 
     - name: Extract quote text
       set_fact:
         quote_text: "{{ quote_response.json[0]['q'] | default('No quote available') }}"
 
+    - name: Fetch local weather
+      ansible.builtin.uri:
+        url: "{{ weather_api }}?q=London&appid={{ api_key }}"
+        return_content: yes
+      register: weather_response
+      failed_when: false
+
+    - name: Extract weather description
+      set_fact:
+        weather_text: "{{ weather_response.json.weather[0].description | default('No weather data') }}"
+
     - name: Deploy Python script for text overlay
       copy:
-        dest: "/tmp/add_overlay.py"
-        mode: '0755'
+        dest: "/usr/local/bin/overlay_text.py"
+        mode: "0755"
         content: |
+          #!/usr/bin/python3
           from PIL import Image, ImageDraw, ImageFont
           import sys
 
@@ -70,34 +75,29 @@
           draw = ImageDraw.Draw(image)
           font = ImageFont.load_default()
 
-          draw.text((10, 20), text1, fill="white", font=font)
-          draw.text((10, 50), text2, fill="white", font=font)
+          draw.text((10, 20), text1, (255, 255, 255), font=font)
+          draw.text((10, 50), text2, (255, 255, 255), font=font)
 
           image.save(output_path)
 
     - name: Overlay text onto wallpaper using Python script
-      command: >
-        python3 /tmp/add_overlay.py "{{ download_path }}" "{{ final_wallpaper_path }}"
-        "Quote: {{ quote_text }}" "Weather: {{ weather_text }}"
+      ansible.builtin.command:
+        cmd: python3 /usr/local/bin/overlay_text.py "{{ download_path }}" "{{ final_wallpaper_path }}" "Quote: {{ quote_text }}" "Weather: {{ weather_text }}"
+      changed_when: true
 
     - name: Set wallpaper using `community.general.dconf`
       community.general.dconf:
         key: "/org/gnome/desktop/background/picture-uri"
         value: "'file://{{ final_wallpaper_path }}'"
         state: present
-      become: yes
-      become_user: "{{ user_name }}"
-      when: ansible_facts.env.XDG_CURRENT_DESKTOP is defined and "gnome" in ansible_facts.env.XDG_CURRENT_DESKTOP | lower
+      when: "'gnome' in ansible_facts.env.XDG_CURRENT_DESKTOP | lower"
 
     - name: Force `dconf update` to apply changes
-      command: dconf update
-      become: yes
-      become_user: "{{ user_name }}"
-      when: ansible_facts.env.XDG_CURRENT_DESKTOP is defined and "gnome" in ansible_facts.env.XDG_CURRENT_DESKTOP | lower
+      ansible.builtin.command:
+        cmd: dconf update
+      when: "'gnome' in ansible_facts.env.XDG_CURRENT_DESKTOP | lower"
 
     - name: Set wallpaper using `gsettings` (Fallback)
       ansible.builtin.command:
         cmd: gsettings set org.gnome.desktop.background picture-uri "file://{{ final_wallpaper_path }}"
-      become: yes
-      become_user: "{{ user_name }}"
-      when: ansible_facts.env.XDG_CURRENT_DESKTOP is defined and "gnome" in ansible_facts.env.XDG_CURRENT_DESKTOP | lower
+      when: "'gnome' in ansible_facts.env.XDG_CURRENT_DESKTOP | lower"
