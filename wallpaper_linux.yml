@@ -1,3 +1,4 @@
+---
 - name: Dynamic Wallpaper Synchronizer for Linux
   hosts: linux
   gather_facts: yes
@@ -138,6 +139,8 @@
           - "/backdrop/screen0/monitor0/image-path"
           - -s
           - "{{ final_wallpaper_path }}"
+      environment:
+        DISPLAY: ":0"
       when: not using_gnome
       changed_when: true
 
