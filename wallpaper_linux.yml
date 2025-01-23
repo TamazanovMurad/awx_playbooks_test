@@ -1,9 +1,8 @@
----
 - name: Dynamic Wallpaper Synchronizer for Linux
   hosts: linux
   gather_facts: yes
   vars:
-    wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop"
+    wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdfHx8fGVufDB8fA%3D%3D"
     weather_api: "http://api.openweathermap.org/data/2.5/weather"
     api_key: "ddfb11805a9028aa945f65d181b4d6fb"
     quote_api: "https://zenquotes.io/api/random"
@@ -16,7 +15,8 @@
         name: 
           - imagemagick
           - dconf-cli
-          - feh  # Fügt `feh` hinzu, um Wallpaper ohne GNOME zu setzen
+          - feh
+          - xvfb  # Installiere Xvfb für virtuelle Displays
         state: present
       become: yes
 
@@ -50,7 +50,7 @@
 
     - name: Fetch local weather
       ansible.builtin.uri:
-        url: "{{ weather_api }}?q={{ ansible_facts['env']['CITY'] | default('Berlin') }}&appid={{ api_key }}"
+        url: "{{ weather_api }}?q=London&appid={{ api_key }}"
         return_content: yes
       register: weather_response
       failed_when: false
@@ -95,10 +95,10 @@
 
     - name: Check if GNOME is being used
       set_fact:
-        using_gnome: "{{ 'gnome' in (ansible_facts.env.XDG_CURRENT_DESKTOP | default('') | lower) }}"
+        using_gnome: "{{ 'gnome' in ansible_facts.env.XDG_CURRENT_DESKTOP | lower | default('') }}"
 
     - name: Debug GNOME detection
-      ansible.builtin.debug:
+      debug:
         msg: "Using GNOME: {{ using_gnome }}"
 
     - name: Set wallpaper using `community.general.dconf`
@@ -126,9 +126,40 @@
       when: using_gnome
 
     - name: Set wallpaper using `feh` (For Kali & non-GNOME systems)
-      ansible.builtin.command:
-        argv:
-          - feh
-          - --bg-scale
-          - "{{ final_wallpaper_path }}"
+      block:
+        - name: Try setting wallpaper with `feh`
+          ansible.builtin.command:
+            argv:
+              - env
+              - DISPLAY=:0
+              - feh
+              - --bg-scale
+              - "{{ final_wallpaper_path }}"
+          register: feh_result
+          ignore_errors: yes
+
+        - name: Start Xvfb and retry `feh` if it failed
+          block:
+            - name: Start a virtual X server
+              ansible.builtin.command:
+                argv:
+                  - Xvfb
+                  - :0
+                  - -screen
+                  - 0
+                  - 1920x1080x24
+              async: 10
+              poll: 0
+              ignore_errors: yes
+
+            - name: Run `feh` using `xvfb-run`
+              ansible.builtin.command:
+                argv:
+                  - xvfb-run
+                  - --server-args="-screen 0 1920x1080x24"
+                  - feh
+                  - --bg-scale
+                  - "{{ final_wallpaper_path }}"
+              changed_when: true
+          when: feh_result.rc != 0
       when: not using_gnome
