@@ -79,8 +79,9 @@
         state: present
 
     - name: Overlay text onto wallpaper using Python script
-      command:
-        cmd: python3 "{{ overlay_script }}" "{{ download_path }}" "{{ final_wallpaper_path }}" "Quote: {{ quote_text }}" "Weather: {{ weather_text }}"
+      command: >-
+        python3 "{{ overlay_script }}" "{{ download_path }}" "{{ final_wallpaper_path }}"
+        "Quote: {{ quote_text }}" "Weather: {{ weather_text }}"
 
     - name: Set wallpaper using `dconf` (GNOME)
       community.general.dconf:
