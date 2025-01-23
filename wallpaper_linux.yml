@@ -7,7 +7,6 @@
     quote_api: "https://zenquotes.io/api/random"
     download_path: "/tmp/wallpaper.jpg"
     final_wallpaper_path: "/usr/share/backgrounds/wallpaper.jpg"
-    overlay_script: "/tmp/add_overlay.py"
     user_name: "kali"  # Falls dein Benutzer anders heißt, ändere das hier!
 
   tasks:
@@ -17,6 +16,7 @@
           - imagemagick
           - python3-pillow
           - dconf-cli
+          - python3-gi  # Für das `community.general.dconf` Modul
         state: present
 
     - name: Ensure the wallpaper directory exists
@@ -55,7 +55,7 @@
 
     - name: Deploy Python script for text overlay
       copy:
-        dest: "{{ overlay_script }}"
+        dest: "/tmp/add_overlay.py"
         mode: '0755'
         content: |
           from PIL import Image, ImageDraw, ImageFont
@@ -76,22 +76,16 @@
           image.save(output_path)
 
     - name: Overlay text onto wallpaper using Python script
-      command: >-
-        python3 "{{ overlay_script }}" "{{ download_path }}" "{{ final_wallpaper_path }}"
+      command: >
+        python3 /tmp/add_overlay.py "{{ download_path }}" "{{ final_wallpaper_path }}"
         "Quote: {{ quote_text }}" "Weather: {{ weather_text }}"
 
-    - name: Set wallpaper using `dconf` (GNOME)
-      shell: >
-        DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
-        dconf write /org/gnome/desktop/background/picture-uri "'file://{{ final_wallpaper_path }}'"
+    - name: Set wallpaper using `community.general.dconf`
+      community.general.dconf:
+        key: "/org/gnome/desktop/background/picture-uri"
+        value: "'file://{{ final_wallpaper_path }}'"
+        state: present
       become: yes
       become_user: "{{ user_name }}"
       ignore_errors: yes
-
-    - name: Set wallpaper using `gsettings` (Fallback)
-      shell: >
-        DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
-        gsettings set org.gnome.desktop.background picture-uri "file://{{ final_wallpaper_path }}"
-      become: yes
-      become_user: "{{ user_name }}"
-      ignore_errors: yes
+      when: ansible_facts.env.XDG_CURRENT_DESKTOP is defined and "gnome" in ansible_facts.env.XDG_CURRENT_DESKTOP | lower
