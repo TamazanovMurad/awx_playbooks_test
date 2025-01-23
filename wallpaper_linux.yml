@@ -14,7 +14,7 @@
       package:
         name:
           - imagemagick
-          - python3-pip
+          - python3-pillow
         state: present
 
     - name: Ensure the wallpaper directory exists
@@ -72,11 +72,6 @@
           draw.text((10, 50), text2, fill="white", font=font)
 
           image.save(output_path)
-
-    - name: Install required Python modules
-      pip:
-        name: pillow
-        state: present
 
     - name: Overlay text onto wallpaper using Python script
       command: >-
