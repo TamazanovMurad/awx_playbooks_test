@@ -7,7 +7,7 @@
     quote_api: "https://zenquotes.io/api/random"
     download_path: "/tmp/wallpaper.jpg"
     final_wallpaper_path: "/usr/share/backgrounds/wallpaper.jpg"
-    user_name: "kali"  # Falls dein Benutzer anders heißt, ändere das hier!
+    user_name: "kali"  # Ändere das zu deinem Benutzernamen!
 
   tasks:
     - name: Install required system packages
@@ -16,7 +16,7 @@
           - imagemagick
           - python3-pillow
           - dconf-cli
-          - python3-gi  # Für das `community.general.dconf` Modul
+          - python3-gi  # Falls `community.general.dconf` genutzt wird
         state: present
 
     - name: Ensure the wallpaper directory exists
@@ -95,11 +95,9 @@
       become_user: "{{ user_name }}"
       when: ansible_facts.env.XDG_CURRENT_DESKTOP is defined and "gnome" in ansible_facts.env.XDG_CURRENT_DESKTOP | lower
 
-    - name: Set wallpaper using `community.general.gsettings` (Fallback)
-      community.general.gsettings:
-        schema: "org.gnome.desktop.background"
-        key: "picture-uri"
-        value: "'file://{{ final_wallpaper_path }}'"
+    - name: Set wallpaper using `gsettings` (Fallback)
+      ansible.builtin.command:
+        cmd: gsettings set org.gnome.desktop.background picture-uri "file://{{ final_wallpaper_path }}"
       become: yes
       become_user: "{{ user_name }}"
       when: ansible_facts.env.XDG_CURRENT_DESKTOP is defined and "gnome" in ansible_facts.env.XDG_CURRENT_DESKTOP | lower
