@@ -15,6 +15,7 @@
         name:
           - imagemagick
           - python3-pillow
+          - dconf-cli  # Falls nicht installiert
         state: present
 
     - name: Ensure the wallpaper directory exists
@@ -79,7 +80,8 @@
         "Quote: {{ quote_text }}" "Weather: {{ weather_text }}"
 
     - name: Set wallpaper using `dconf` (GNOME)
-      community.general.dconf:
-        key: "/org/gnome/desktop/background/picture-uri"
-        value: "'file://{{ final_wallpaper_path }}'"
-      when: "'gnome' in ansible_facts['env']['XDG_CURRENT_DESKTOP'] | lower"
+      command: dconf write /org/gnome/desktop/background/picture-uri "'file://{{ final_wallpaper_path }}'"
+
+    - name: Set wallpaper using `gsettings` (Fallback)
+      command: gsettings set org.gnome.desktop.background picture-uri "file://{{ final_wallpaper_path }}"
+      ignore_errors: yes
