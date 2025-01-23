@@ -15,8 +15,8 @@
         name: 
           - imagemagick
           - dconf-cli
-          - xfconf
-          - dbus-x11  # Fügt D-Bus-Unterstützung hinzu
+          - xfce4-settings
+          - dbus-x11
         state: present
       become: yes
 
@@ -95,12 +95,13 @@
 
     - name: Check if GNOME is being used
       set_fact:
-        using_gnome: "{{ ansible_facts.env.get('XDG_CURRENT_DESKTOP', '') | lower is search('gnome') }}"
+        using_gnome: "{{ 'gnome' in (ansible_facts.env.XDG_CURRENT_DESKTOP | default('')).lower() }}"
 
     - name: Debug GNOME detection
       debug:
         msg: "Using GNOME: {{ using_gnome }}"
 
+    # 🖼️ Set Wallpaper - GNOME (dconf)
     - name: Set wallpaper using `community.general.dconf`
       community.general.dconf:
         key: "/org/gnome/desktop/background/picture-uri"
@@ -115,6 +116,7 @@
           - update
       when: using_gnome
 
+    # 🖼️ Set Wallpaper - GNOME (gsettings)
     - name: Set wallpaper using `gsettings` (Fallback for GNOME)
       ansible.builtin.command:
         argv:
@@ -125,24 +127,27 @@
           - "file://{{ final_wallpaper_path }}"
       when: using_gnome
 
+    # 🖼️ Set Wallpaper - XFCE (Kali)
     - name: Set wallpaper using `xfconf-query` (For XFCE/Kali)
       ansible.builtin.command:
         argv:
-          - dbus-launch
           - xfconf-query
           - -c
           - xfce4-desktop
           - -p
-          - /backdrop/screen0/monitor0/image-path
+          - "/backdrop/screen0/monitor0/image-path"
           - -s
           - "{{ final_wallpaper_path }}"
-      environment:
-        DISPLAY: ":0"
       when: not using_gnome
+      changed_when: true
 
+    # 🔄 Reload XFCE Desktop
     - name: Reload XFCE Desktop
       ansible.builtin.command:
         argv:
+          - dbus-launch
           - xfdesktop
           - --reload
+      environment:
+        DISPLAY: ":0"
       when: not using_gnome
