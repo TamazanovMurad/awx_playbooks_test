@@ -1,56 +1,68 @@
----
 - name: Dynamic Wallpaper Synchronizer for Linux
-  hosts: all
-  become: true
-  tasks:
+  hosts: linux
+  gather_facts: yes
+  vars:
+    wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fA%3D%3D"
+    weather_api: "http://api.openweathermap.org/data/2.5/weather"
+    api_key: "ddfb11805a9028aa945f65d181b4d6fb"
+    quote_api: "https://zenquotes.io/api/random"
+    download_path: "/tmp/wallpaper.jpg"
+    final_wallpaper_path: "/usr/share/backgrounds/wallpaper.jpg"
 
+  tasks:
     - name: Install required system packages
       ansible.builtin.apt:
-        name:
-          - wget
-          - python3-pip
+        name: 
+          - imagemagick
           - dconf-cli
-          - feh
         state: present
-        update_cache: true
+      become: yes
+
+    - name: Debug Environment Variables
+      debug:
+        var: ansible_facts.env
 
     - name: Ensure wallpaper directory exists
       ansible.builtin.file:
-        path: /usr/share/backgrounds
+        path: "/usr/share/backgrounds"
         state: directory
-        mode: '0755'
+        mode: "0755"
+      become: yes
 
     - name: Download wallpaper image
       ansible.builtin.get_url:
-        url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fA%3D%3D"
-        dest: /usr/share/backgrounds/wallpaper.jpg
-        mode: '0644'
+        url: "{{ wallpaper_url }}"
+        dest: "{{ download_path }}"
+        mode: "0644"
 
     - name: Fetch dynamic quote
       ansible.builtin.uri:
-        url: "https://api.quotable.io/random"
-        return_content: true
+        url: "{{ quote_api }}"
+        return_content: yes
       register: quote_response
+      failed_when: false
 
     - name: Extract quote text
       set_fact:
-        quote_text: "{{ quote_response.json.content }}"
+        quote_text: "{{ quote_response.json[0]['q'] | default('No quote available') }}"
 
     - name: Fetch local weather
       ansible.builtin.uri:
-        url: "https://wttr.in/?format=%C"
-        return_content: true
+        url: "{{ weather_api }}?q=London&appid={{ api_key }}"
+        return_content: yes
       register: weather_response
+      failed_when: false
 
     - name: Extract weather description
       set_fact:
-        weather_text: "{{ weather_response.content | trim }}"
+        weather_text: "{{ weather_response.json.weather[0].description | default('No weather data') }}"
 
     - name: Deploy Python script for text overlay
       ansible.builtin.copy:
-        dest: /usr/local/bin/overlay_text.py
-        mode: '0755'
+        dest: "/usr/local/bin/overlay_text.py"
+        mode: "0755"
         content: |
+          #!/usr/bin/python3
           from PIL import Image, ImageDraw, ImageFont
           import sys
 
@@ -59,41 +71,39 @@
           text1 = sys.argv[3]
           text2 = sys.argv[4]
 
-          img = Image.open(image_path)
-          draw = ImageDraw.Draw(img)
+          image = Image.open(image_path)
+          draw = ImageDraw.Draw(image)
           font = ImageFont.load_default()
 
-          draw.text((10, 10), text1, font=font, fill="white")
-          draw.text((10, 30), text2, font=font, fill="white")
+          draw.text((10, 20), text1, (255, 255, 255), font=font)
+          draw.text((10, 50), text2, (255, 255, 255), font=font)
 
-          img.save(output_path)
+          image.save(output_path)
 
     - name: Overlay text onto wallpaper using Python script
       ansible.builtin.command:
-        cmd: "python3 /usr/local/bin/overlay_text.py /usr/share/backgrounds/wallpaper.jpg /usr/share/backgrounds/final_wallpaper.jpg 'Quote: {{ quote_text }}' 'Weather: {{ weather_text }}'"
+        argv:
+          - python3
+          - "/usr/local/bin/overlay_text.py"
+          - "{{ download_path }}"
+          - "{{ final_wallpaper_path }}"
+          - "Quote: {{ quote_text }}"
+          - "Weather: {{ weather_text }}"
       changed_when: true
-
-    - name: Check if XDG_CURRENT_DESKTOP is set
-      set_fact:
-        desktop_env: "{{ ansible_facts.env.XDG_CURRENT_DESKTOP | default('unknown') | lower }}"
-
-    - name: Debug desktop environment
-      debug:
-        var: desktop_env
 
     - name: Set wallpaper using `community.general.dconf`
       community.general.dconf:
         key: "/org/gnome/desktop/background/picture-uri"
-        value: "'file:///usr/share/backgrounds/final_wallpaper.jpg'"
+        value: "'file://{{ final_wallpaper_path }}'"
         state: present
-      when: "'gnome' in desktop_env"
+      when: "'gnome' in ansible_facts.env.XDG_CURRENT_DESKTOP | lower"
 
     - name: Force `dconf update` to apply changes
       ansible.builtin.command:
         argv:
           - dconf
           - update
-      when: "'gnome' in desktop_env"
+      when: "'gnome' in ansible_facts.env.XDG_CURRENT_DESKTOP | lower"
 
     - name: Set wallpaper using `gsettings` (Fallback)
       ansible.builtin.command:
@@ -102,13 +112,5 @@
           - set
           - org.gnome.desktop.background
           - picture-uri
-          - "file:///usr/share/backgrounds/final_wallpaper.jpg"
-      when: "'gnome' in desktop_env"
-
-    - name: Set wallpaper using `feh` (For non-GNOME systems like Kali)
-      ansible.builtin.command:
-        argv:
-          - feh
-          - --bg-scale
-          - "/usr/share/backgrounds/final_wallpaper.jpg"
-      when: "'gnome' not in desktop_env"
+          - "file://{{ final_wallpaper_path }}"
+      when: "'gnome' in ansible_facts.env.XDG_CURRENT_DESKTOP | lower"
