@@ -15,7 +15,8 @@
         name: 
           - imagemagick
           - dconf-cli
-          - xfconf  # Falls XFCE genutzt wird
+          - xfconf
+          - dbus-x11  # Fügt D-Bus-Unterstützung hinzu
         state: present
       become: yes
 
@@ -127,6 +128,7 @@
     - name: Set wallpaper using `xfconf-query` (For XFCE/Kali)
       ansible.builtin.command:
         argv:
+          - dbus-launch
           - xfconf-query
           - -c
           - xfce4-desktop
@@ -134,4 +136,13 @@
           - /backdrop/screen0/monitor0/image-path
           - -s
           - "{{ final_wallpaper_path }}"
+      environment:
+        DISPLAY: ":0"
+      when: not using_gnome
+
+    - name: Reload XFCE Desktop
+      ansible.builtin.command:
+        argv:
+          - xfdesktop
+          - --reload
       when: not using_gnome
