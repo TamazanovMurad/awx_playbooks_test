@@ -13,6 +13,7 @@
       ansible.builtin.apt:
         name:
           - feh
+          - imagemagick
           - dbus-x11
         state: present
       become: yes
@@ -57,10 +58,15 @@
         argv:
           - convert
           - "{{ download_path }}"
-          - -gravity South
-          - -pointsize 20
-          - -fill white
-          - -annotate +0+10 "Quote: {{ quote_text }} | Weather: {{ weather_text }}"
+          - "-gravity"
+          - "South"
+          - "-pointsize"
+          - "20"
+          - "-fill"
+          - "white"
+          - "-annotate"
+          - "+0+10"
+          - "Quote: {{ quote_text }} | Weather: {{ weather_text }}"
           - "{{ download_path }}"
       changed_when: true
 
@@ -68,7 +74,7 @@
       ansible.builtin.command:
         argv:
           - feh
-          - --bg-scale
+          - "--bg-scale"
           - "{{ download_path }}"
       environment:
         DISPLAY: ":0"
