@@ -58,7 +58,7 @@
         weather_text: "{{ weather_response.json.weather[0].description | default('No weather data') }}"
 
     - name: Deploy Python script for text overlay
-      copy:
+      ansible.builtin.copy:
         dest: "/usr/local/bin/overlay_text.py"
         mode: "0755"
         content: |
@@ -82,7 +82,13 @@
 
     - name: Overlay text onto wallpaper using Python script
       ansible.builtin.command:
-        cmd: python3 /usr/local/bin/overlay_text.py "{{ download_path }}" "{{ final_wallpaper_path }}" "Quote: {{ quote_text }}" "Weather: {{ weather_text }}"
+        argv:
+          - python3
+          - "/usr/local/bin/overlay_text.py"
+          - "{{ download_path }}"
+          - "{{ final_wallpaper_path }}"
+          - "Quote: {{ quote_text }}"
+          - "Weather: {{ weather_text }}"
       changed_when: true
 
     - name: Set wallpaper using `community.general.dconf`
@@ -94,10 +100,17 @@
 
     - name: Force `dconf update` to apply changes
       ansible.builtin.command:
-        cmd: dconf update
+        argv:
+          - dconf
+          - update
       when: "'gnome' in ansible_facts.env.XDG_CURRENT_DESKTOP | lower"
 
     - name: Set wallpaper using `gsettings` (Fallback)
       ansible.builtin.command:
-        cmd: gsettings set org.gnome.desktop.background picture-uri "file://{{ final_wallpaper_path }}"
+        argv:
+          - gsettings
+          - set
+          - org.gnome.desktop.background
+          - picture-uri
+          - "file://{{ final_wallpaper_path }}"
       when: "'gnome' in ansible_facts.env.XDG_CURRENT_DESKTOP | lower"
