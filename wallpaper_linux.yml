@@ -87,5 +87,19 @@
         state: present
       become: yes
       become_user: "{{ user_name }}"
-      ignore_errors: yes
+      when: ansible_facts.env.XDG_CURRENT_DESKTOP is defined and "gnome" in ansible_facts.env.XDG_CURRENT_DESKTOP | lower
+
+    - name: Force `dconf update` to apply changes
+      command: dconf update
+      become: yes
+      become_user: "{{ user_name }}"
+      when: ansible_facts.env.XDG_CURRENT_DESKTOP is defined and "gnome" in ansible_facts.env.XDG_CURRENT_DESKTOP | lower
+
+    - name: Set wallpaper using `community.general.gsettings` (Fallback)
+      community.general.gsettings:
+        schema: "org.gnome.desktop.background"
+        key: "picture-uri"
+        value: "'file://{{ final_wallpaper_path }}'"
+      become: yes
+      become_user: "{{ user_name }}"
       when: ansible_facts.env.XDG_CURRENT_DESKTOP is defined and "gnome" in ansible_facts.env.XDG_CURRENT_DESKTOP | lower
