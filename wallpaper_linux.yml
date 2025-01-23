@@ -1,8 +1,9 @@
+---
 - name: Dynamic Wallpaper Synchronizer for Linux
   hosts: linux
   gather_facts: yes
   vars:
-    wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fA%3D%3D"
+    wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop"
     weather_api: "http://api.openweathermap.org/data/2.5/weather"
     api_key: "ddfb11805a9028aa945f65d181b4d6fb"
     quote_api: "https://zenquotes.io/api/random"
@@ -15,6 +16,7 @@
         name: 
           - imagemagick
           - dconf-cli
+          - feh  # Fügt `feh` hinzu, um Wallpaper ohne GNOME zu setzen
         state: present
       become: yes
 
@@ -48,7 +50,7 @@
 
     - name: Fetch local weather
       ansible.builtin.uri:
-        url: "{{ weather_api }}?q=London&appid={{ api_key }}"
+        url: "{{ weather_api }}?q={{ ansible_facts['env']['CITY'] | default('Berlin') }}&appid={{ api_key }}"
         return_content: yes
       register: weather_response
       failed_when: false
@@ -91,19 +93,27 @@
           - "Weather: {{ weather_text }}"
       changed_when: true
 
+    - name: Check if GNOME is being used
+      set_fact:
+        using_gnome: "{{ 'gnome' in (ansible_facts.env.XDG_CURRENT_DESKTOP | default('') | lower) }}"
+
+    - name: Debug GNOME detection
+      ansible.builtin.debug:
+        msg: "Using GNOME: {{ using_gnome }}"
+
     - name: Set wallpaper using `community.general.dconf`
       community.general.dconf:
         key: "/org/gnome/desktop/background/picture-uri"
         value: "'file://{{ final_wallpaper_path }}'"
         state: present
-      when: "'gnome' in ansible_facts.env.XDG_CURRENT_DESKTOP | lower"
+      when: using_gnome
 
     - name: Force `dconf update` to apply changes
       ansible.builtin.command:
         argv:
           - dconf
           - update
-      when: "'gnome' in ansible_facts.env.XDG_CURRENT_DESKTOP | lower"
+      when: using_gnome
 
     - name: Set wallpaper using `gsettings` (Fallback)
       ansible.builtin.command:
@@ -113,4 +123,12 @@
           - org.gnome.desktop.background
           - picture-uri
           - "file://{{ final_wallpaper_path }}"
-      when: "'gnome' in ansible_facts.env.XDG_CURRENT_DESKTOP | lower"
+      when: using_gnome
+
+    - name: Set wallpaper using `feh` (For Kali & non-GNOME systems)
+      ansible.builtin.command:
+        argv:
+          - feh
+          - --bg-scale
+          - "{{ final_wallpaper_path }}"
+      when: not using_gnome
