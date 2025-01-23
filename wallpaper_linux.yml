@@ -7,6 +7,7 @@
     api_key: "ddfb11805a9028aa945f65d181b4d6fb"
     quote_api: "https://zenquotes.io/api/random"
     download_path: "/tmp/wallpaper.jpg"
+    location: "Berlin"  # 🌍 Wetter-Ort anpassen
 
   tasks:
     - name: Install required packages
@@ -28,7 +29,8 @@
         url: "{{ quote_api }}"
         return_content: yes
       register: quote_response
-      failed_when: false
+      failed_when: quote_response.status != 200
+      ignore_errors: true
 
     - name: Extract quote text
       set_fact:
@@ -36,14 +38,15 @@
 
     - name: Fetch local weather
       ansible.builtin.uri:
-        url: "{{ weather_api }}?q=London&appid={{ api_key }}"
+        url: "{{ weather_api }}?q={{ location }}&appid={{ api_key }}&units=metric"
         return_content: yes
       register: weather_response
-      failed_when: false
+      failed_when: weather_response.status != 200
+      ignore_errors: true
 
     - name: Extract weather description
       set_fact:
-        weather_text: "{{ weather_response.json.weather[0].description | default('No weather data') }}"
+        weather_text: "{{ weather_response.json.weather[0].description | default('No weather data') }} | Temp: {{ weather_response.json.main.temp | default('N/A') }}°C"
 
     - name: Overlay text onto wallpaper
       ansible.builtin.command:
@@ -70,3 +73,11 @@
         DISPLAY: ":0"
         XAUTHORITY: "/home/{{ ansible_user }}/.Xauthority"
       changed_when: true
+
+    - name: Ensure wallpaper is set on startup
+      ansible.builtin.lineinfile:
+        path: "/home/{{ ansible_user }}/.xsessionrc"
+        line: "feh --bg-scale {{ download_path }}"
+        create: yes
+        state: present
+      become: no
