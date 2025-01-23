@@ -8,6 +8,7 @@
     download_path: "/tmp/wallpaper.jpg"
     final_wallpaper_path: "/usr/share/backgrounds/wallpaper.jpg"
     overlay_script: "/tmp/add_overlay.py"
+    user_name: "kali"  # Falls dein Benutzer anders heißt, ändere das hier!
 
   tasks:
     - name: Install required system packages
@@ -15,7 +16,7 @@
         name:
           - imagemagick
           - python3-pillow
-          - dconf-cli  # Falls nicht installiert
+          - dconf-cli
         state: present
 
     - name: Ensure the wallpaper directory exists
@@ -80,8 +81,17 @@
         "Quote: {{ quote_text }}" "Weather: {{ weather_text }}"
 
     - name: Set wallpaper using `dconf` (GNOME)
-      command: dconf write /org/gnome/desktop/background/picture-uri "'file://{{ final_wallpaper_path }}'"
+      shell: >
+        DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+        dconf write /org/gnome/desktop/background/picture-uri "'file://{{ final_wallpaper_path }}'"
+      become: yes
+      become_user: "{{ user_name }}"
+      ignore_errors: yes
 
     - name: Set wallpaper using `gsettings` (Fallback)
-      command: gsettings set org.gnome.desktop.background picture-uri "file://{{ final_wallpaper_path }}"
+      shell: >
+        DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+        gsettings set org.gnome.desktop.background picture-uri "file://{{ final_wallpaper_path }}"
+      become: yes
+      become_user: "{{ user_name }}"
       ignore_errors: yes
