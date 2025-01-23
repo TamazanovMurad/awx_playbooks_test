@@ -2,67 +2,88 @@
   hosts: linux
   gather_facts: yes
   vars:
-    wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-    weather_api: "http://api.openweathermap.org/data/2.5/weather"
-    api_key: "ddfb11805a9028aa945f65d181b4d6fb"
+    wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fA%3D%3D"
+    weather_api: "http://api.openweathermap.org/data/2.5/weather?q=London&appid=ddfb11805a9028aa945f65d181b4d6fb"
     quote_api: "https://zenquotes.io/api/random"
     download_path: "/tmp/wallpaper.jpg"
     final_wallpaper_path: "/usr/share/backgrounds/wallpaper.jpg"
+    overlay_script: "/tmp/add_overlay.py"
 
   tasks:
-    - name: Ensure download directory exists
+    - name: Install required system packages
+      package:
+        name:
+          - imagemagick
+          - python3-pip
+        state: present
+
+    - name: Ensure the wallpaper directory exists
       file:
-        path: "/tmp"
+        path: "/usr/share/backgrounds"
         state: directory
+        mode: '0755'
+
+    - name: Download wallpaper image
+      get_url:
+        url: "{{ wallpaper_url }}"
+        dest: "{{ download_path }}"
+        mode: '0644'
 
     - name: Fetch dynamic quote
       uri:
         url: "{{ quote_api }}"
         return_content: yes
       register: quote_response
-      failed_when: false
-
-    - name: Debug quote response
-      debug:
-        var: quote_response
+      failed_when: quote_response.status != 200
 
     - name: Fetch local weather
       uri:
-        url: "{{ weather_api }}?q=London&appid={{ api_key }}"
+        url: "{{ weather_api }}"
         return_content: yes
       register: weather_response
-      failed_when: false
+      failed_when: weather_response.status != 200
 
-    - name: Download wallpaper image
-      command: wget -O "{{ download_path }}" "{{ wallpaper_url }}"
-      ignore_errors: yes
+    - name: Extract weather description
+      set_fact:
+        weather_text: "{{ weather_response.json.weather[0].description | default('Unknown weather') }}"
 
-    - name: Verify downloaded image file
-      shell: file "{{ download_path }}"
-      register: verify_image
-      failed_when: "'image data' not in verify_image.stdout"
+    - name: Extract quote text
+      set_fact:
+        quote_text: "{{ quote_response.json[0]['q'] | default('No quote available') }}"
 
-    - name: Debug converted command
-      command: >
-        echo convert "{{ download_path }}"
-        -pointsize 20 -fill white -annotate +10+20 "Quote: {{ quote_response.json[0]['q'] }}"
-        -pointsize 20 -fill white -annotate +10+50 "Weather: {{ weather_response.json.weather[0].description }}"
-        "{{ final_wallpaper_path }}"
-      register: convert_command
+    - name: Deploy Python script for text overlay
+      copy:
+        dest: "{{ overlay_script }}"
+        mode: '0755'
+        content: |
+          from PIL import Image, ImageDraw, ImageFont
+          import sys
 
-    - name: Print converted command
-      debug:
-        var: convert_command
+          image_path = sys.argv[1]
+          output_path = sys.argv[2]
+          text1 = sys.argv[3]
+          text2 = sys.argv[4]
 
-    - name: Overlay quote and weather on the wallpaper
-      command: >
-        convert "{{ download_path }}"
-        -pointsize 20 -fill white -annotate +10+20 "Quote: {{ quote_response.json[0]['q'] }}"
-        -pointsize 20 -fill white -annotate +10+50 "Weather: {{ weather_response.json.weather[0].description }}"
-        "{{ final_wallpaper_path }}"
-      when: quote_response.status == 200 and weather_response.status == 200
+          image = Image.open(image_path)
+          draw = ImageDraw.Draw(image)
+          font = ImageFont.load_default()
 
-    - name: Apply the wallpaper
-      shell: |
-        gsettings set org.gnome.desktop.background picture-uri "file://{{ final_wallpaper_path }}"
-      ignore_errors: yes
+          draw.text((10, 20), text1, fill="white", font=font)
+          draw.text((10, 50), text2, fill="white", font=font)
+
+          image.save(output_path)
+
+    - name: Install required Python modules
+      pip:
+        name: pillow
+        state: present
+
+    - name: Overlay text onto wallpaper using Python script
+      command:
+        cmd: python3 "{{ overlay_script }}" "{{ download_path }}" "{{ final_wallpaper_path }}" "Quote: {{ quote_text }}" "Weather: {{ weather_text }}"
+
+    - name: Set wallpaper using `dconf` (GNOME)
+      community.general.dconf:
+        key: "/org/gnome/desktop/background/picture-uri"
+        value: "'file://{{ final_wallpaper_path }}'"
+      when: "'gnome' in ansible_facts['env']['XDG_CURRENT_DESKTOP'] | lower"
