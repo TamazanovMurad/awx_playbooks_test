@@ -1,5 +1,4 @@
----
-- name: Dynamic Wallpaper Synchronizer for Linux
+- name: Dynamic Wallpaper Synchronizer for Kali Linux (XFCE)
   hosts: linux
   gather_facts: yes
   vars:
@@ -8,36 +7,30 @@
     api_key: "ddfb11805a9028aa945f65d181b4d6fb"
     quote_api: "https://zenquotes.io/api/random"
     download_path: "/tmp/wallpaper.jpg"
-    final_wallpaper_path: "/usr/share/backgrounds/wallpaper.jpg"
 
   tasks:
-    - name: Install required system packages
+    # 📌 Erforderliche Pakete installieren
+    - name: Install required packages
       ansible.builtin.apt:
         name: 
+          - feh
           - imagemagick
-          - dconf-cli
-          - xfce4-settings
-          - dbus-x11
         state: present
       become: yes
 
+    # 📌 Debugging: Umgebungsvariablen ausgeben
     - name: Debug Environment Variables
       debug:
         var: ansible_facts.env
 
-    - name: Ensure wallpaper directory exists
-      ansible.builtin.file:
-        path: "/usr/share/backgrounds"
-        state: directory
-        mode: "0755"
-      become: yes
-
+    # 📌 Hintergrundbild herunterladen
     - name: Download wallpaper image
       ansible.builtin.get_url:
         url: "{{ wallpaper_url }}"
         dest: "{{ download_path }}"
         mode: "0644"
 
+    # 📌 Zitat abrufen
     - name: Fetch dynamic quote
       ansible.builtin.uri:
         url: "{{ quote_api }}"
@@ -49,6 +42,7 @@
       set_fact:
         quote_text: "{{ quote_response.json[0]['q'] | default('No quote available') }}"
 
+    # 📌 Wetter abrufen
     - name: Fetch local weather
       ansible.builtin.uri:
         url: "{{ weather_api }}?q=London&appid={{ api_key }}"
@@ -60,97 +54,29 @@
       set_fact:
         weather_text: "{{ weather_response.json.weather[0].description | default('No weather data') }}"
 
-    - name: Deploy Python script for text overlay
-      ansible.builtin.copy:
-        dest: "/usr/local/bin/overlay_text.py"
-        mode: "0755"
-        content: |
-          #!/usr/bin/python3
-          from PIL import Image, ImageDraw, ImageFont
-          import sys
-
-          image_path = sys.argv[1]
-          output_path = sys.argv[2]
-          text1 = sys.argv[3]
-          text2 = sys.argv[4]
-
-          image = Image.open(image_path)
-          draw = ImageDraw.Draw(image)
-          font = ImageFont.load_default()
-
-          draw.text((10, 20), text1, (255, 255, 255), font=font)
-          draw.text((10, 50), text2, (255, 255, 255), font=font)
-
-          image.save(output_path)
-
-    - name: Overlay text onto wallpaper using Python script
+    # 📌 Text in das Hintergrundbild einfügen (mit ImageMagick)
+    - name: Overlay text onto wallpaper
       ansible.builtin.command:
         argv:
-          - python3
-          - "/usr/local/bin/overlay_text.py"
+          - convert
           - "{{ download_path }}"
-          - "{{ final_wallpaper_path }}"
-          - "Quote: {{ quote_text }}"
-          - "Weather: {{ weather_text }}"
+          - -gravity
+          - South
+          - -pointsize
+          - "20"
+          - -fill
+          - white
+          - -annotate
+          - "+0+50"
+          - "Quote: {{ quote_text }} | Weather: {{ weather_text }}"
+          - "{{ download_path }}"
       changed_when: true
 
-    - name: Check if GNOME is being used
-      set_fact:
-        using_gnome: "{{ 'gnome' in (ansible_facts.env.XDG_CURRENT_DESKTOP | default('')).lower() }}"
-
-    - name: Debug GNOME detection
-      debug:
-        msg: "Using GNOME: {{ using_gnome }}"
-
-    # 🖼️ Set Wallpaper - GNOME (dconf)
-    - name: Set wallpaper using `community.general.dconf`
-      community.general.dconf:
-        key: "/org/gnome/desktop/background/picture-uri"
-        value: "'file://{{ final_wallpaper_path }}'"
-        state: present
-      when: using_gnome
-
-    - name: Force `dconf update` to apply changes
+    # 🖼️ Hintergrundbild mit `feh` setzen
+    - name: Set wallpaper using feh
       ansible.builtin.command:
         argv:
-          - dconf
-          - update
-      when: using_gnome
-
-    # 🖼️ Set Wallpaper - GNOME (gsettings)
-    - name: Set wallpaper using `gsettings` (Fallback for GNOME)
-      ansible.builtin.command:
-        argv:
-          - gsettings
-          - set
-          - org.gnome.desktop.background
-          - picture-uri
-          - "file://{{ final_wallpaper_path }}"
-      when: using_gnome
-
-    # 🖼️ Set Wallpaper - XFCE (Kali)
-    - name: Set wallpaper using `xfconf-query` (For XFCE/Kali)
-      ansible.builtin.command:
-        argv:
-          - xfconf-query
-          - -c
-          - xfce4-desktop
-          - -p
-          - "/backdrop/screen0/monitor0/image-path"
-          - -s
-          - "{{ final_wallpaper_path }}"
-      environment:
-        DISPLAY: ":0"
-      when: not using_gnome
+          - feh
+          - --bg-scale
+          - "{{ download_path }}"
       changed_when: true
-
-    # 🔄 Reload XFCE Desktop
-    - name: Reload XFCE Desktop
-      ansible.builtin.command:
-        argv:
-          - dbus-launch
-          - xfdesktop
-          - --reload
-      environment:
-        DISPLAY: ":0"
-      when: not using_gnome
