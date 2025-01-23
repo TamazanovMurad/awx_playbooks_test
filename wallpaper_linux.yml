@@ -2,27 +2,19 @@
   hosts: linux
   gather_facts: yes
   vars:
-    wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fA%3D%3D"
+    wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop"
     weather_api: "http://api.openweathermap.org/data/2.5/weather"
     api_key: "ddfb11805a9028aa945f65d181b4d6fb"
     quote_api: "https://zenquotes.io/api/random"
     download_path: "/tmp/wallpaper.jpg"
 
   tasks:
-    - name: Install required system packages
+    - name: Install required packages
       ansible.builtin.apt:
         name:
           - feh
           - imagemagick
-          - dbus-x11
         state: present
-      become: yes
-
-    - name: Ensure wallpaper directory exists
-      ansible.builtin.file:
-        path: "/usr/share/backgrounds"
-        state: directory
-        mode: "0755"
       become: yes
 
     - name: Download wallpaper image
@@ -58,14 +50,12 @@
         argv:
           - convert
           - "{{ download_path }}"
-          - "-gravity"
-          - "South"
-          - "-pointsize"
-          - "20"
-          - "-fill"
-          - "white"
-          - "-annotate"
-          - "+0+10"
+          - -fill
+          - white
+          - -pointsize
+          - "24"
+          - -annotate
+          - +10+50
           - "Quote: {{ quote_text }} | Weather: {{ weather_text }}"
           - "{{ download_path }}"
       changed_when: true
@@ -78,4 +68,5 @@
           - "{{ download_path }}"
       environment:
         DISPLAY: ":0"
+        XAUTHORITY: "/home/{{ ansible_user }}/.Xauthority"
       changed_when: true
