@@ -2,7 +2,7 @@
   hosts: linux
   gather_facts: yes
   vars:
-    wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdfHx8fGVufDB8fA%3D%3D"
+    wallpaper_url: "https://images.unsplash.com/photo-1483982258113-b72862e6cff6?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fA%3D%3D"
     weather_api: "http://api.openweathermap.org/data/2.5/weather"
     api_key: "ddfb11805a9028aa945f65d181b4d6fb"
     quote_api: "https://zenquotes.io/api/random"
@@ -15,8 +15,7 @@
         name: 
           - imagemagick
           - dconf-cli
-          - feh
-          - xvfb  # Installiere Xvfb für virtuelle Displays
+          - xfconf  # Falls XFCE genutzt wird
         state: present
       become: yes
 
@@ -95,7 +94,7 @@
 
     - name: Check if GNOME is being used
       set_fact:
-        using_gnome: "{{ 'gnome' in ansible_facts.env.XDG_CURRENT_DESKTOP | lower | default('') }}"
+        using_gnome: "{{ ansible_facts.env.get('XDG_CURRENT_DESKTOP', '') | lower is search('gnome') }}"
 
     - name: Debug GNOME detection
       debug:
@@ -115,7 +114,7 @@
           - update
       when: using_gnome
 
-    - name: Set wallpaper using `gsettings` (Fallback)
+    - name: Set wallpaper using `gsettings` (Fallback for GNOME)
       ansible.builtin.command:
         argv:
           - gsettings
@@ -125,41 +124,14 @@
           - "file://{{ final_wallpaper_path }}"
       when: using_gnome
 
-    - name: Set wallpaper using `feh` (For Kali & non-GNOME systems)
-      block:
-        - name: Try setting wallpaper with `feh`
-          ansible.builtin.command:
-            argv:
-              - env
-              - DISPLAY=:0
-              - feh
-              - --bg-scale
-              - "{{ final_wallpaper_path }}"
-          register: feh_result
-          ignore_errors: yes
-
-        - name: Start Xvfb and retry `feh` if it failed
-          block:
-            - name: Start a virtual X server
-              ansible.builtin.command:
-                argv:
-                  - Xvfb
-                  - :0
-                  - -screen
-                  - 0
-                  - 1920x1080x24
-              async: 10
-              poll: 0
-              ignore_errors: yes
-
-            - name: Run `feh` using `xvfb-run`
-              ansible.builtin.command:
-                argv:
-                  - xvfb-run
-                  - --server-args="-screen 0 1920x1080x24"
-                  - feh
-                  - --bg-scale
-                  - "{{ final_wallpaper_path }}"
-              changed_when: true
-          when: feh_result.rc != 0
+    - name: Set wallpaper using `xfconf-query` (For XFCE/Kali)
+      ansible.builtin.command:
+        argv:
+          - xfconf-query
+          - -c
+          - xfce4-desktop
+          - -p
+          - /backdrop/screen0/monitor0/image-path
+          - -s
+          - "{{ final_wallpaper_path }}"
       when: not using_gnome
