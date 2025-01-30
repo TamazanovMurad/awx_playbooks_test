@@ -1,0 +1,25 @@
+# .github/workflows/ansible.yml
+name: Run Ansible Playbooks
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  execute-ansible:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: sudo apt update && sudo apt install -y ansible
+
+      - name: Install Collections
+        run: ansible-galaxy collection install -r requirements.yml
+
+      - name: Run Windows Backup Playbook
+        run: ansible-playbook Windows_backup.yml -i hosts.ini
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+          VAULT_RESTIC_PASSWORD: ${{ secrets.VAULT_PASSWORD }}
