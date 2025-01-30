@@ -1,51 +1,33 @@
 ---
-- name: Konfiguriere Restic auf Windows
-  hosts: windows
-  collections:
-    - community.crypto
+- name: Full System Backup with Restic
+  hosts: all
+  gather_facts: no
+  vars:
+    restic_repo: "/backups/restic-repo"
+    restic_password: "dein_sicheres_passwort"  # Ersetze dies durch dein Restic-Repository-Passwort
   tasks:
-    - name: Erstelle den .ssh-Ordner, falls nicht vorhanden
-      ansible.builtin.file:
-        path: "C:/Benutzer/{{ ansible_user }}/.ssh"
-        state: directory
-        mode: '0700'
+    # Restic auf Windows installieren
+    - name: Install Restic on Windows
+      win_chocolatey:
+        name: restic
+        state: present
+      when: "'windows' in group_names"
 
-    - name: Generiere ein SSH-Schlüsselpaar mit PowerShell
-      win_shell: |
-        if (-not (Test-Path "C:/Benutzer/{{ ansible_user }}/.ssh/id_ed25519")) {
-          ssh-keygen -t ed25519 -f "C:/Benutzer/{{ ansible_user }}/.ssh/id_ed25519" -N ""
-        }
-      args:
-        creates: "C:/Benutzer/{{ ansible_user }}/.ssh/id_ed25519"
+    # Restic auf Kali Linux installieren
+    - name: Install Restic on Kali Linux
+      apt:
+        name: restic
+        state: present
+      when: "'kali' in group_names"
 
-    - name: Kopiere den öffentlichen Schlüssel zum Backup-Server
-      win_shell: |
-        $publicKey = Get-Content -Path "C:/Benutzer/{{ ansible_user }}/.ssh/id_ed25519.pub"
-        ssh {{ backup_user }}@{{ ansible_host }} "echo $publicKey >> ~/.ssh/authorized_keys"
-      vars:
-        backup_user: rbackup
-      args:
-        creates: "/home/{{ backup_user }}/.ssh/authorized_keys"
+    # Backup für Windows erstellen
+    - name: Create Windows system backup with Restic
+      win_command: |
+        restic -r "\\ubuntu-server\backups\restic-repo" backup C:\ --password "{{ restic_password }}"
+      when: "'windows' in group_names"
 
-    - name: Setze Umgebungsvariable für Restic Passwort
-      win_environment:
-        name: RESTIC_PASSWORD
-        value: "{{ restic_password }}"
-      vars:
-        restic_password: kali
-
-    - name: Initialisiere das Backup-Repository
-      win_shell: |
-        restic -r sftp:{{ backup_user }}@{{ ansible_host }}:/windows init
-      environment:
-        RESTIC_PASSWORD: "{{ restic_password }}"
-      vars:
-        backup_user: rbackup
-
-    - name: Führe ein Test-Backup durch
-      win_shell: |
-        restic -r sftp:{{ backup_user }}@{{ ansible_host }}:/windows backup C:\ --use-fs-snapshot
-      environment:
-        RESTIC_PASSWORD: "{{ restic_password }}"
-      vars:
-        backup_user: rbackup
+    # Backup für Kali Linux erstellen
+    - name: Create Kali Linux system backup with Restic
+      command: |
+        restic -r /backups/restic-repo backup / --password "{{ restic_password }}"
+      when: "'kali' in group_names"
