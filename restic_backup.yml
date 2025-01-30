@@ -4,7 +4,7 @@
   gather_facts: no
   vars:
     restic_repo: "/backups/restic-repo"
-    restic_password: "dein_sicheres_passwort"  # Ersetze dies durch dein Restic-Repository-Passwort
+    restic_password: "kali"
   tasks:
     # Restic auf Windows installieren
     - name: Install Restic on Windows
@@ -18,7 +18,7 @@
       apt:
         name: restic
         state: present
-      when: "'kali' in group_names"
+      when: "'linux' in group_names"
 
     # Backup für Windows erstellen
     - name: Create Windows system backup with Restic
@@ -30,4 +30,4 @@
     - name: Create Kali Linux system backup with Restic
       command: |
         restic -r /backups/restic-repo backup / --password "{{ restic_password }}"
-      when: "'kali' in group_names"
+      when: "'linux' in group_names"
