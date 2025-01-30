@@ -1,0 +1,4 @@
+---
+backup_server_ip: 192.168.100.137
+backup_user: backuper
+vault_restic_password: "{{ vault_restic_password }}"

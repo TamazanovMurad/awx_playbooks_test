@@ -1,30 +1,36 @@
 ---
-- name: Full System Backup with Restic
+- name: Full System Backup
   hosts: all
-  gather_facts: no
-  vars:
-    restic_repo: "/backups/restic-repo"
-    restic_password: "kali"
-  tasks:
-    - name: Installiere Restic via Chocolatey
-      win_shell: |
-        choco install -y restic
+  gather_facts: yes
 
-    # Restic auf Kali Linux installieren
-    - name: Install Restic on Kali Linux
+  tasks:
+    - name: Install Restic (Windows)
+      win_chocolatey:
+        name: restic
+        state: present
+      when: ansible_os_family == 'Windows'
+
+    - name: Install Restic (Linux)
       apt:
         name: restic
         state: present
-      when: "'linux' in group_names"
+        update_cache: yes
+      when: ansible_os_family == 'Debian'
 
-    # Backup für Windows erstellen
-    - name: Create Windows system backup with Restic
+    - name: Execute Windows Backup
       win_command: |
-        restic -r "\\ubuntu-server\backups\restic-repo" backup C:\ --password "{{ restic_password }}"
-      when: "'windows' in group_names"
+        restic -r "\\{{ backup_server_ip }}\backups" backup C:\ 
+        --password "{{ vault_restic_password }}" 
+        --host "{{ inventory_hostname }}"
+      args:
+        stdin: "{{ vault_restic_password }}"
+      when: ansible_os_family == 'Windows'
 
-    # Backup für Kali Linux erstellen
-    - name: Create Kali Linux system backup with Restic
+    - name: Execute Linux Backup
       command: |
-        restic -r /backups/restic-repo backup / --password "{{ restic_password }}"
-      when: "'linux' in group_names"
+        restic -r "sftp:{{ backup_user }}@{{ backup_server_ip }}:/backups" backup / 
+        --password "{{ vault_restic_password }}" 
+        --host "{{ inventory_hostname }}"
+      args:
+        stdin: "{{ vault_restic_password }}"
+      when: ansible_os_family == 'Debian'
