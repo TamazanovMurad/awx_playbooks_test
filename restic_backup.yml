@@ -6,12 +6,9 @@
     restic_repo: "/backups/restic-repo"
     restic_password: "kali"
   tasks:
-    # Restic auf Windows installieren
-    - name: Install Restic on Windows
-      win_chocolatey:
-        name: restic
-        state: present
-      when: "'windows' in group_names"
+    - name: Installiere Restic via Chocolatey
+      win_shell: |
+        choco install -y restic
 
     # Restic auf Kali Linux installieren
     - name: Install Restic on Kali Linux
