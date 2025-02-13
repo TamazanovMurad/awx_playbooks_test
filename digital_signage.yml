@@ -34,14 +34,15 @@
   vars:
     dest_path: "C:\\inetpub\\wwwroot\\system_status.html"
   tasks:
-    - name: Installiere den Web Platform Installer
-      win_chocolatey:
-        name: webpicmd
+    - name: Sicherstellen, dass die IIS-Komponenten installiert sind
+      ansible.windows.win_feature:
+        name:
+          - IIS-WebServerRole
+          - IIS-WebServer
+          - IIS-CommonHttpFeatures
+          - IIS-HttpErrors
+          - IIS-StaticContent
         state: present
-
-    - name: Installiere IIS über WebPI
-      community.windows.win_webpicmd:
-        name: IIS
 
     - name: Dashboard HTML mittels Template generieren (Windows)
       win_template:
