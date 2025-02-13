@@ -29,7 +29,7 @@
 # Play 2: Windows-Systemstatus aktualisieren
 
 - name: System Status Dashboard auf Windows-Clients aktualisieren
-  hosts: windows_dashboard
+  hosts: windows
   gather_facts: yes
   vars:
     dest_path: "C:\\inetpub\\wwwroot\\system_status.html"
@@ -45,7 +45,7 @@
 
     - name: Dashboard HTML mittels Template generieren (Windows)
       win_template:
-        src: templates/dashboard_windows.html.j2
+        src: templates/welcome_windows.html.j2
         dest: "{{ dest_path }}"
       notify:
         - Restart IIS
