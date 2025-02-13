@@ -27,7 +27,6 @@
         state: restarted
 
 # Play 2: Windows-Systemstatus aktualisieren
-
 - name: System Status Dashboard auf Windows-Clients aktualisieren
   hosts: windows
   gather_facts: yes
@@ -37,14 +36,15 @@
     - name: Sicherstellen, dass die IIS-Komponenten installiert sind
       ansible.windows.win_feature:
         name:
-          - IIS-DefaultDocument  # Wichtig für Standard-HTML-Dateien
-          - IIS-ApplicationDevelopment
-          - IIS-ManagementConsole  # Optional für Debugging
+          - IIS-WebServerRole
+          - IIS-WebServer
+          - IIS-CommonHttpFeatures
+          - IIS-HttpErrors
+          - IIS-StaticContent
         state: present
-      notify: Restart IIS  # Neustart nach Installation
 
     - name: Dashboard HTML mittels Template generieren (Windows)
-      win_template:
+      ansible.windows.win_template:
         src: templates/welcome_windows.html.j2
         dest: "{{ dest_path }}"
       notify:
@@ -52,6 +52,6 @@
 
   handlers:
     - name: Restart IIS
-      win_service:
+      ansible.windows.win_service:
         name: W3SVC
         state: restarted
