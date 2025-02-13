@@ -1,0 +1,52 @@
+---
+# Play 1: Linux-Systemstatus aktualisieren
+- name: System Status Dashboard auf Linux aktualisieren
+  hosts: linux
+  gather_facts: yes
+  become: true
+  vars:
+    dest_path: "/var/www/html/system_status.html"
+  tasks:
+    - name: Sicherstellen, dass Apache installiert ist
+      apt:
+        name: apache2
+        state: present
+        update_cache: yes
+
+    - name: Dashboard HTML mittels Template generieren (Linux)
+      template:
+        src: templates/welcome_linux.html.j2
+        dest: "{{ dest_path }}"
+      notify:
+        - Restart Apache
+
+  handlers:
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+
+# Play 2: Systemstatus-Dashboard auf Windows aktualisieren
+- name: System Status Dashboard auf Windows aktualisieren
+  hosts: windows
+  gather_facts: yes
+  vars:
+    dest_path: "C:\\inetpub\\wwwroot\\system_status.html"
+  tasks:
+    - name: Sicherstellen, dass IIS installiert ist
+      win_feature:
+        name: Web-Server
+        state: present
+
+    - name: Dashboard HTML mittels Template generieren (Windows)
+      win_template:
+        src: templates/welcome_windows.html.j2
+        dest: "{{ dest_path }}"
+      notify:
+        - Restart IIS
+
+  handlers:
+    - name: Restart IIS
+      win_service:
+        name: W3SVC
+        state: restarted

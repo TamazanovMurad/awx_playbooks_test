@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>System Status Dashboard - {{ ansible_hostname }}</title>
+  <style>
+    body { font-family: Verdana, sans-serif; background: #eef; margin: 0; padding: 0; }
+    header { background: #005a9c; color: #fff; padding: 20px; text-align: center; }
+    .container { width: 80%; margin: 20px auto; background: #fff; padding: 20px; border-radius: 5px; }
+    h2 { color: #005a9c; }
+    p { font-size: 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>System Status Dashboard</h1>
+  </header>
+  <div class="container">
+    <section>
+      <h2>Betriebssystem</h2>
+      <p>{{ ansible_distribution }} {{ ansible_distribution_version }}</p>
+    </section>
+    <section>
+      <h2>CPU</h2>
+      <p>{{ ansible_processor[0] }}</p>
+    </section>
+    <section>
+      <h2>Speicher</h2>
+      <p>Gesamter Speicher: {{ ansible_memtotal_mb }} MB</p>
+      <p>Freier Speicher: {{ ansible_memfree_mb }} MB</p>
+    </section>
+    <section>
+      <h2>Aktuelles Datum/Uptime</h2>
+      <p>{{ ansible_date_time.iso8601 }}</p>
+    </section>
+  </div>
+</body>
+</html>
