@@ -26,16 +26,22 @@
         name: apache2
         state: restarted
 
-# Play 2: Systemstatus-Dashboard auf Windows aktualisieren
-- name: System Status Dashboard auf Windows aktualisieren
+# Play 2: Windows-Systemstatus aktualisieren
+
+- name: System Status Dashboard auf Windows-Clients aktualisieren
   hosts: windows
   gather_facts: yes
   vars:
     dest_path: "C:\\inetpub\\wwwroot\\system_status.html"
   tasks:
-    - name: Sicherstellen, dass IIS installiert ist
-      win_feature:
-        name: Web-Server
+    - name: Sicherstellen, dass die IIS-Komponenten installiert sind
+      ansible.windows.win_feature:
+        name:
+          - IIS-WebServerRole
+          - IIS-WebServer
+          - IIS-CommonHttpFeatures
+          - IIS-HttpErrors
+          - IIS-StaticContent
         state: present
 
     - name: Dashboard HTML mittels Template generieren (Windows)
