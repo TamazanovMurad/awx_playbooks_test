@@ -2,6 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>System Status Dashboard - {{ ansible_hostname }}</title>
   <style>
     body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
@@ -22,16 +23,23 @@
     </section>
     <section>
       <h2>CPU</h2>
-      <p>{{ ansible_processor[0] }}</p>
+      <p>
+        {%- if ansible_processor | length > 1 -%}
+          {{ ansible_processor[1] }}
+        {%- else -%}
+          {{ ansible_processor[0] }}
+        {%- endif -%}
+      </p>
     </section>
     <section>
-      <h2>Speicher</h2>
-      <p>Gesamter Speicher: {{ ansible_memtotal_mb }} MB</p>
-      <p>Freier Speicher: {{ ansible_memfree_mb }} MB</p>
+      <h2>Festplattenspeicher (Root)</h2>
+      {% set root_mount = (ansible_mounts | selectattr('mount', 'equalto', '/') | list).0 %}
+      <p>Gesamter Speicherplatz: {{ (root_mount.size_total | int) / (1024*1024*1024) | round(2) }} GB</p>
+      <p>Freier Speicherplatz: {{ (root_mount.size_available | int) / (1024*1024*1024) | round(2) }} GB</p>
     </section>
     <section>
       <h2>Aktuelles Datum/Uptime</h2>
-      <p>{{ ansible_date_time.iso8601 }}</p>
+      <p>{{ ansible_date_time.iso8601 | to_datetime | strftime('%A, %d. %B %Y, %H:%M:%S') }}</p>
     </section>
   </div>
 </body>

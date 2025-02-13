@@ -2,6 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>System Status Dashboard - {{ ansible_hostname }}</title>
   <style>
     body { font-family: Verdana, sans-serif; background: #eef; margin: 0; padding: 0; }
@@ -22,16 +23,16 @@
     </section>
     <section>
       <h2>CPU</h2>
-      <p>{{ ansible_processor[0] }}</p>
+      <p>{{ cpu_info }}</p>
     </section>
     <section>
-      <h2>Speicher</h2>
-      <p>Gesamter Speicher: {{ ansible_memtotal_mb }} MB</p>
-      <p>Freier Speicher: {{ ansible_memfree_mb }} MB</p>
+      <h2>Festplattenspeicher (C:)</h2>
+      <p>Gesamter Speicherplatz: {{ disk_size_gb }} GB</p>
+      <p>Freier Speicherplatz: {{ disk_free_gb }} GB</p>
     </section>
     <section>
       <h2>Aktuelles Datum/Uptime</h2>
-      <p>{{ ansible_date_time.iso8601 }}</p>
+      <p>{{ ansible_date_time.iso8601 | to_datetime | strftime('%A, %d. %B %Y, %H:%M:%S') }}</p>
     </section>
   </div>
 </body>

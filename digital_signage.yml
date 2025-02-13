@@ -38,6 +38,26 @@
         path: "C:\\inetpub\\wwwroot"
         state: directory
 
+    - name: Get CPU info on Windows
+      ansible.windows.win_shell: "Get-CimInstance Win32_Processor | Select-Object -ExpandProperty Name"
+      register: cpu_output
+
+    - name: Set CPU fact for Windows
+      set_fact:
+        cpu_info: "{{ cpu_output.stdout | trim }}"
+
+    - name: Get disk info for C: on Windows
+      ansible.windows.win_shell: |
+        $disk = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='C:'"
+        Write-Output "Size=$($disk.Size)"
+        Write-Output "FreeSpace=$($disk.FreeSpace)"
+      register: disk_output
+
+    - name: Set disk facts for Windows
+      set_fact:
+        disk_size_gb: "{{ (disk_output.stdout_lines[0].split('=')[1] | int) / (1024*1024*1024) | round(2) }}"
+        disk_free_gb: "{{ (disk_output.stdout_lines[1].split('=')[1] | int) / (1024*1024*1024) | round(2) }}"
+
     - name: Dashboard HTML mittels Template generieren (Windows)
       ansible.windows.win_template:
         src: templates/welcome_windows.html.j2
