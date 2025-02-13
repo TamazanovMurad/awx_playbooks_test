@@ -32,7 +32,7 @@
     </section>
     <section>
       <h2>Aktuelles Datum/Uptime</h2>
-      <p>{{ ansible_date_time.iso8601 | regex_replace('Z$', '') | to_datetime("%Y-%m-%dT%H:%M:%S") | strftime('%A, %d. %B %Y, %H:%M:%S') }}</p>
+     <p>{{ '%A, %d. %B %Y, %H:%M:%S' | strftime(ansible_date_time.epoch | int) }}</p>
     </section>
   </div>
 </body>
