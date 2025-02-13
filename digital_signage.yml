@@ -29,24 +29,23 @@
 # Play 2: Windows-Systemstatus aktualisieren
 
 - name: System Status Dashboard auf Windows-Clients aktualisieren
-  hosts: windows
+  hosts: windows_dashboard
   gather_facts: yes
   vars:
     dest_path: "C:\\inetpub\\wwwroot\\system_status.html"
   tasks:
-    - name: Sicherstellen, dass die IIS-Komponenten installiert sind
-      ansible.windows.win_feature:
-        name:
-          - IIS-WebServerRole
-          - IIS-WebServer
-          - IIS-CommonHttpFeatures
-          - IIS-HttpErrors
-          - IIS-StaticContent
+    - name: Installiere den Web Platform Installer
+      win_chocolatey:
+        name: webpicmd
         state: present
+
+    - name: Installiere IIS über WebPI
+      community.windows.win_webpicmd:
+        name: IIS
 
     - name: Dashboard HTML mittels Template generieren (Windows)
       win_template:
-        src: templates/welcome_windows.html.j2
+        src: templates/dashboard_windows.html.j2
         dest: "{{ dest_path }}"
       notify:
         - Restart IIS
