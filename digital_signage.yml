@@ -37,12 +37,11 @@
     - name: Sicherstellen, dass die IIS-Komponenten installiert sind
       ansible.windows.win_feature:
         name:
-          - IIS-WebServerRole
-          - IIS-WebServer
-          - IIS-CommonHttpFeatures
-          - IIS-HttpErrors
-          - IIS-StaticContent
+          - IIS-DefaultDocument  # Wichtig für Standard-HTML-Dateien
+          - IIS-ApplicationDevelopment
+          - IIS-ManagementConsole  # Optional für Debugging
         state: present
+      notify: Restart IIS  # Neustart nach Installation
 
     - name: Dashboard HTML mittels Template generieren (Windows)
       win_template:
