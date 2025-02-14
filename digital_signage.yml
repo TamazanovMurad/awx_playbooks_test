@@ -38,14 +38,14 @@
         path: "C:\\inetpub\\wwwroot"
         state: directory
 
-    - name: Sammle aktuelle Zeitinformationen (PowerShell)
+    - name: Aktuelle Epoch-Zeit erfassen
       ansible.windows.win_shell: |
-        Get-Date -UFormat %s  # Holt die aktuelle Epoch-Zeit
-      register: win_epoch_time
+        [DateTimeOffset]::Now.ToUnixTimeSeconds()
+      register: win_time
 
-    - name: Setze epoch_time fact
+    - name: Setze korrekte Zeitvariable
       set_fact:
-        epoch_time: "{{ win_epoch_time.stdout | int }}"
+        epoch_time: "{{ win_time.stdout | int }}"
 
     - name: Get CPU info on Windows
       ansible.windows.win_shell: "Get-CimInstance Win32_Processor | Select-Object -ExpandProperty Name"
