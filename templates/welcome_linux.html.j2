@@ -39,7 +39,7 @@
     </section>
     <section>
       <h2>Aktuelles Datum/Uptime</h2>
-      <p>{{ '%A, %d. %B %Y, (%H + 1):%M:%S' | strftime(ansible_date_time.epoch | int) }}</p>
+      <p>{{ '%A, %d. %B %Y, %H:%M:%S' | strftime(ansible_date_time.epoch | int + 3600) }}</p>
     </section>
   </div>
 </body>
