@@ -32,7 +32,7 @@
     </section>
     <section>
       <h2>Aktuelles Datum/Uptime</h2>
-      <p>{{ '%A, %d. %B %Y, %H:%M:%S' | strftime(epoch_time) }}</p>
+      <p>{{ '%A, %d. %B %Y, %H:%M:%S' | strftime(epoch_time | int + 3600) }}</p>
     </section>
   </div>
 </body>
