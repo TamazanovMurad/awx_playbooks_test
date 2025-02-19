@@ -1,18 +1,15 @@
 ---
-- name: Windows Backup mit Restic
+- name: Backup Windows Hosts
   hosts: windows
   gather_facts: no
   vars:
-    restic_password: "{{ restic_vault_password }}"  # Aus Vault
-    smb_username: "{{ smb_username }}"              # Aus SMB Credential
-    smb_password: "{{ smb_password }}"              # Aus SMB Credential
+    restic_password: "kali"
     backup_repo: "\\\\192.168.72.131\\backup"
     backup_paths:
       - C:\Users\ansible
       - C:\Programme
-
   tasks:
-    - name: Install Chocolatey
+    - name: Install Chocolatey if not already installed
       win_shell: |
         if (-not (Test-Path "$env:ProgramData\Chocolatey")) {
           Set-ExecutionPolicy Bypass -Scope Process -Force
@@ -31,77 +28,18 @@
     - name: Install Restic
       win_shell: |
         choco install restic -y --force
+
+    - name: Initialize repository with direct credentials
+      win_shell: |
+        net use {{ backup_repo }} /user:backuper kali
+        restic -r "{{ backup_repo }}" init --password "{{ restic_password }}"
       args:
         executable: cmd
 
-    - name: Configure SMB access
-      block:
-        - name: Connect to SMB share
-          win_shell: |
-            net use {{ backup_repo }} /user:{{ smb_username }} "{{ smb_password }}" /persistent:no
-          args:
-            executable: cmd
-          register: net_use
-          failed_when: net_use.rc not in [0, 2]
-
-        - name: Initialize repository
-          win_shell: |
-            restic -r "{{ backup_repo }}" init --password "{{ restic_password }}"
-          args:
-            executable: cmd
-          register: repo_init
-          changed_when: "'already initialized' not in repo_init.stderr"
-
-      always:
-        - name: Debug SMB connection
-          debug:
-            var: net_use
-
-    - name: Execute backups
-      block:
-        - name: Reconnect SMB share
-          win_shell: |
-            net use {{ backup_repo }} /user:{{ smb_username }} "{{ smb_password }}" /persistent:no
-          args:
-            executable: cmd
-
-        - name: Run restic backup
-          win_shell: |
-            restic backup {{ item }} --repo "{{ backup_repo }}" --password "{{ restic_password }}" --verbose
-          loop: "{{ backup_paths }}"
-          args:
-            executable: cmd
-          register: backup_results
-
-      always:
-        - name: Show backup status
-          debug:
-            msg: "Backup {{ item.item }}: {{ 'OK' if item.rc == 0 else 'FAILED' }}"
-          loop: "{{ backup_results.results }}"
-          loop_control:
-            label: "{{ item.item }}"
-
-    - name: Verify results
-      block:
-        - name: List snapshots
-          win_shell: |
-            restic -r "{{ backup_repo }}" snapshots --password "{{ restic_password }}"
-          args:
-            executable: cmd
-          register: snapshots
-
-        - name: Check repository
-          win_shell: |
-            restic -r "{{ backup_repo }}" check --password "{{ restic_password }}"
-          args:
-            executable: cmd
-          register: repo_check
-
-      always:
-        - name: Show snapshots
-          debug:
-            msg: "{{ snapshots.stdout_lines }}"
-
-        - name: Show check results
-          debug:
-            msg: "{{ repo_check.stdout_lines }}"
+    - name: Run backups
+      win_shell: |
+        net use {{ backup_repo }} /user:backuper kali
+        restic backup {{ item }} --repo "{{ backup_repo }}" --password "{{ restic_password }}"
+      loop: "{{ backup_paths }}"
+      args:
+        executable: cmd
