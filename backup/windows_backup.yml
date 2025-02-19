@@ -4,7 +4,7 @@
   gather_facts: no
   vars:
     restic_password: "kali"  # RESTIC-Passwort
-    backup_repo: "Z:"        # Verwende den eingebundenen Netzlaufwerksbuchstaben
+    backup_repo: "local:Z:\\"  # Verwende den eingebundenen Netzlaufwerksbuchstaben mit `local:`-Präfix
     backup_paths:
       - C:\Users
       - C:\Programme
@@ -47,7 +47,9 @@
     - name: Ensure repository is initialized
       win_shell: |
         $env:RESTIC_PASSWORD = "{{ restic_password }}"
-        restic -r {{ backup_repo }} snapshots || restic -r {{ backup_repo }} init
+        if (-not (restic -r {{ backup_repo }} snapshots 2>$null)) {
+            restic -r {{ backup_repo }} init
+        }
       register: repo_init_result
       ignore_errors: yes
 
