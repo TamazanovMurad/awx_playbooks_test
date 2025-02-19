@@ -4,7 +4,7 @@
     gather_facts: no
     vars:
       restic_password: "kali"
-      backup_repo: "//192.168.72.131/backup"
+      backup_repo: "\\\\192.168.72.131\\backup"  # Direkter UNC-Pfad
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
@@ -25,37 +25,27 @@
             - "C:\\ProgramData\\chocolatey\\bin"
           state: present
   
-      - name: Install latest Restic using Chocolatey
+      - name: Install Restic
         win_shell: |
           choco install restic -y --force
   
-      - name: Configure Restic repository with SMB
-        block:
-          - name: Mount SMB share temporarily
-            win_shell: |
-              net use T: \\192.168.72.131\backup /user:backuper kali
-            args:
-              executable: cmd
+      - name: Ensure repository access
+        win_shell: |
+          net use {{ backup_repo }} /user:backuper kali
+        args:
+          executable: cmd
   
-          - name: Initialize Restic repository
-            win_shell: |
-              $env:RESTIC_PASSWORD = "{{ restic_password }}"
-              restic -r "local:T:" init
-            args:
-              executable: cmd
-  
-        always:
-          - name: Unmount SMB share
-            win_shell: |
-              net use T: /delete /y
-            args:
-              executable: cmd
-            ignore_errors: yes
-  
-      - name: Execute backups directly via SMB
+      - name: Initialize repository if needed
         win_shell: |
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
-          restic backup {{ item }} --repo "smb://backuper:kali@192.168.72.131/backup"
+          restic -r "{{ backup_repo }}" snapshots || restic -r "{{ backup_repo }}" init
+        args:
+          executable: cmd
+  
+      - name: Run backups
+        win_shell: |
+          $env:RESTIC_PASSWORD = "{{ restic_password }}"
+          restic backup {{ item }} --repo "{{ backup_repo }}"
         loop: "{{ backup_paths }}"
         args:
           executable: cmd
