@@ -4,9 +4,9 @@
   gather_facts: no
   vars:
     restic_password: "kali"
-    backup_repo: "\\\\192.168.72.131\\mnt\\backup\\repo"
+    backup_repo: "Z:"  # Verwende den eingebundenen Netzlaufwerksbuchstaben
     backup_paths:
-      - C:\Benutzer\kali
+      - C:\Users
       - C:\Programme
   tasks:
     - name: Install Chocolatey if not already installed
@@ -34,6 +34,32 @@
         elements:
           - "C:\\ProgramData\\chocolatey\\bin"
         state: present
+
+    - name: Save network credentials using cmdkey
+      win_shell: |
+        cmdkey /add:192.168.72.131 /user:backuper /pass:kali
+      args:
+        creates: "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\Connections\Credentials"
+
+    - name: Mount network drive with credentials
+      win_shell: |
+        $Username = "backuper"
+        $Password = "kali" | ConvertTo-SecureString -AsPlainText -Force
+        $Credential = New-Object System.Management.Automation.PSCredential($Username, $Password)
+        New-PSDrive -Name "Z" -PSProvider FileSystem -Root "\\192.168.72.131\backup" -Credential $Credential -Persist
+      args:
+        creates: "Z:"
+
+    - name: Ensure repository is initialized
+      win_shell: |
+        $env:RESTIC_PASSWORD = "{{ restic_password }}"
+        restic -r {{ backup_repo }} snapshots || restic -r {{ backup_repo }} init
+      register: repo_init_result
+      ignore_errors: yes
+
+    - name: Debug repository initialization result
+      debug:
+        var: repo_init_result.stdout_lines
 
     - name: Run Restic Backup
       win_shell: |
