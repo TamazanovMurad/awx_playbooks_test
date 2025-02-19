@@ -6,7 +6,7 @@
     restic_password: "kali"
     backup_repo: "\\\\192.168.72.131\\mnt\\backup\\repo"
     backup_paths:
-      - C:\Benutzer\*
+      - C:\Benutzer\kali
       - C:\Programme
   tasks:
     - name: Install Chocolatey if not already installed
@@ -18,6 +18,12 @@
         }
       args:
         creates: "C:\\ProgramData\\Chocolatey"
+
+    - name: Add Chocolatey to PATH
+      win_path:
+        elements:
+          - "C:\\ProgramData\\chocolatey\\bin"
+        state: present
 
     - name: Install Restic using Chocolatey
       win_shell: |
