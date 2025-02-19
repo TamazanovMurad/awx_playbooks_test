@@ -1,17 +1,18 @@
 ---
-- name: Backup Windows Hosts
+- name: Windows Backup mit Restic
   hosts: windows
   gather_facts: no
   vars:
-    restic_password: "{{ restic_vault_password }}"  # Aus AWX Vault
+    restic_password: "{{ restic_vault_password }}"  # Aus Vault
+    smb_username: "{{ smb_username }}"              # Aus SMB Credential
+    smb_password: "{{ smb_password }}"              # Aus SMB Credential
     backup_repo: "\\\\192.168.72.131\\backup"
-    smb_username: "{{ smb_vault_username }}"        # Aus AWX Vault
     backup_paths:
       - C:\Users\ansible
       - C:\Programme
 
   tasks:
-    - name: Install Chocolatey if not already installed
+    - name: Install Chocolatey
       win_shell: |
         if (-not (Test-Path "$env:ProgramData\Chocolatey")) {
           Set-ExecutionPolicy Bypass -Scope Process -Force
@@ -33,38 +34,38 @@
       args:
         executable: cmd
 
-    - name: Initialize repository with direct credentials
+    - name: Configure SMB access
       block:
-        - name: Connect network share
+        - name: Connect to SMB share
           win_shell: |
-            net use {{ backup_repo }} /user:{{ smb_username }} "{{ restic_password }}" /persistent:no
+            net use {{ backup_repo }} /user:{{ smb_username }} "{{ smb_password }}" /persistent:no
           args:
             executable: cmd
-          register: net_connect
-          failed_when: net_connect.rc not in [0, 2]
+          register: net_use
+          failed_when: net_use.rc not in [0, 2]
 
-        - name: Init repository
+        - name: Initialize repository
           win_shell: |
             restic -r "{{ backup_repo }}" init --password "{{ restic_password }}"
           args:
             executable: cmd
-          register: init_result
-          changed_when: "'already initialized' not in init_result.stderr"
+          register: repo_init
+          changed_when: "'already initialized' not in repo_init.stderr"
 
       always:
-        - name: Debug init output
+        - name: Debug SMB connection
           debug:
-            var: init_result
+            var: net_use
 
-    - name: Run backups
+    - name: Execute backups
       block:
-        - name: Reconnect network share
+        - name: Reconnect SMB share
           win_shell: |
-            net use {{ backup_repo }} /user:{{ smb_username }} "{{ restic_password }}" /persistent:no
+            net use {{ backup_repo }} /user:{{ smb_username }} "{{ smb_password }}" /persistent:no
           args:
             executable: cmd
 
-        - name: Execute backup
+        - name: Run restic backup
           win_shell: |
             restic backup {{ item }} --repo "{{ backup_repo }}" --password "{{ restic_password }}" --verbose
           loop: "{{ backup_paths }}"
@@ -73,33 +74,34 @@
           register: backup_results
 
       always:
-        - name: Show backup results
+        - name: Show backup status
           debug:
-            msg: "Backup {{ item.item }}: {{ 'SUCCESS' if item.rc == 0 else 'FAILED' }}"
+            msg: "Backup {{ item.item }}: {{ 'OK' if item.rc == 0 else 'FAILED' }}"
           loop: "{{ backup_results.results }}"
           loop_control:
             label: "{{ item.item }}"
 
-    - name: Verify snapshots
-      win_shell: |
-        restic -r "{{ backup_repo }}" snapshots --password "{{ restic_password }}"
-      args:
-        executable: cmd
-      register: snapshots
-      changed_when: false
+    - name: Verify results
+      block:
+        - name: List snapshots
+          win_shell: |
+            restic -r "{{ backup_repo }}" snapshots --password "{{ restic_password }}"
+          args:
+            executable: cmd
+          register: snapshots
 
-    - name: Show snapshots
-      debug:
-        msg: "{{ snapshots.stdout_lines }}"
+        - name: Check repository
+          win_shell: |
+            restic -r "{{ backup_repo }}" check --password "{{ restic_password }}"
+          args:
+            executable: cmd
+          register: repo_check
 
-    - name: Check repository integrity
-      win_shell: |
-        restic -r "{{ backup_repo }}" check --password "{{ restic_password }}"
-      args:
-        executable: cmd
-      register: integrity_check
-      changed_when: false
+      always:
+        - name: Show snapshots
+          debug:
+            msg: "{{ snapshots.stdout_lines }}"
 
-    - name: Show integrity check
-      debug:
-        msg: "{{ integrity_check.stdout_lines }}"
+        - name: Show check results
+          debug:
+            msg: "{{ repo_check.stdout_lines }}"
