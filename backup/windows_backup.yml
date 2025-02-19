@@ -4,7 +4,7 @@
     gather_facts: no
     vars:
       restic_password: "kali"
-      backup_repo: "\\\\192.168.72.131\\backup"  # Original-UNC-Pfad wie im manuellen Befehl
+      backup_repo: "\\\\192.168.72.131\\backup"
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
@@ -29,29 +29,17 @@
         win_shell: |
           choco install restic -y --force
   
-      - name: Configure repository access
-        block:
-          - name: Add persistent credentials
-            win_shell: |
-              cmdkey /add:192.168.72.131 /user:backuper /pass:kali
-            args:
-              executable: cmd
-  
-          - name: Initialize repository as user
-            win_shell: |
-              $env:RESTIC_PASSWORD = "{{ restic_password }}"
-              restic -r "{{ backup_repo }}" init
-            become: yes
-            become_method: runas
-            become_user: backuper
-            become_flags: logon_type=new_credentials
-            args:
-              executable: cmd
+      - name: Initialize repository with direct credentials
+        win_shell: |
+          net use {{ backup_repo }} /user:backuper kali
+          restic -r "{{ backup_repo }}" init --password "{{ restic_password }}"
+        args:
+          executable: cmd
   
       - name: Run backups
         win_shell: |
-          $env:RESTIC_PASSWORD = "{{ restic_password }}"
-          restic backup {{ item }} --repo "{{ backup_repo }}"
+          net use {{ backup_repo }} /user:backuper kali
+          restic backup {{ item }} --repo "{{ backup_repo }}" --password "{{ restic_password }}"
         loop: "{{ backup_paths }}"
         args:
           executable: cmd
