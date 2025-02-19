@@ -24,11 +24,12 @@
         creates: "C:\\ProgramData\\chocolatey\\lib\\restic"
 
     - name: Map network drive persistently
-      win_shell: net use {{ backup_repo.replace('/', '\\') }} /user:backuper kali /persistent:yes
+      win_shell: |
+        net use "{{ backup_repo }}" /user:backuper kali /persistent:yes
       args:
         executable: cmd
       register: net_result
-      failed_when: net_result.rc != 0 and 'error 85' not in net_result.stderr  # Ignoriere "Bereits verbunden"
+      failed_when: net_result.rc != 0 and 'error 85' not in net_result.stderr
 
     - name: Initialize repo only if needed
       win_shell: restic -r "{{ backup_repo }}" snapshots --password "{{ restic_password }}" || restic -r "{{ backup_repo }}" init --password "{{ restic_password }}"
