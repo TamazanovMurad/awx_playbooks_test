@@ -6,7 +6,7 @@
     restic_password: "kali"
     backup_repo: "\\\\192.168.72.131\\mnt\\backup\\repo"
     restic_url: "https://github.com/restic/restic/releases/download/v0.15.1/restic_0.15.1_windows_amd64.zip"
-    restic_install_path: "C:\\Program Files\\Restic"
+    restic_install_path: "C:\\Programme\\Restic"
     backup_paths:
       - C:\Benutzer
       - C:\Programme
@@ -21,11 +21,10 @@
         url: "{{ restic_url }}"
         dest: "{{ restic_install_path }}\\restic.zip"
 
-    - name: Extract Restic binary
-      win_unzip:
-        src: "{{ restic_install_path }}\\restic.zip"
-        dest: "{{ restic_install_path }}"
-        creates: "{{ restic_install_path }}\\restic.exe"
+    - name: Extract Restic binary using PowerShell
+      win_shell: |
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory("{{ restic_install_path }}\\restic.zip", "{{ restic_install_path }}")
 
     - name: Add Restic to PATH
       win_path:
