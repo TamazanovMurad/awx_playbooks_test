@@ -7,6 +7,7 @@
     backup_repo: "\\\\192.168.72.131\\mnt\\backup\\repo"
     restic_url: "https://github.com/restic/restic/releases/download/v0.15.1/restic_0.15.1_windows_amd64.zip"
     restic_install_path: "C:\\Programme\\Restic"
+    restic_exe: "C:\\Programme\\Restic\\restic.exe"
     backup_paths:
       - C:\Benutzer
       - C:\Programme
@@ -35,5 +36,5 @@
     - name: Run Restic Backup
       win_shell: |
         $env:RESTIC_PASSWORD = "{{ restic_password }}"
-        restic backup {{ item }} --repo {{ backup_repo }}
+        & "{{ restic_exe }}" backup {{ item }} --repo {{ backup_repo }}
       loop: "{{ backup_paths }}"
