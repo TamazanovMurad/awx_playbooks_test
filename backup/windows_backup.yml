@@ -4,7 +4,7 @@
     gather_facts: no
     vars:
       restic_password: "kali"
-      backup_repo: "Z:"
+      backup_repo: "local:Z:"
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
@@ -31,7 +31,7 @@
   
       - name: Map network drive with credentials
         win_shell: |
-          net use Z: \\192.168.72.131\backup /user:backuper kali
+          net use Z: \\192.168.72.131\backup /user:backuper kali /persistent:yes
         args:
           executable: cmd
         register: drive_map
@@ -40,9 +40,9 @@
       - name: Ensure repository is initialized
         win_shell: |
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
-          restic -r {{ backup_repo }} snapshots 2>$null || restic -r {{ backup_repo }} init
-        args:
-          no_profile: false  # Wichtig für Umgebungsvariablen
+          if (-not (restic -r {{ backup_repo }} snapshots 2>$null)) {
+            restic -r {{ backup_repo }} init
+          }
         register: repo_init_result
         ignore_errors: yes
   
@@ -51,8 +51,6 @@
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
           restic backup {{ item }} --repo {{ backup_repo }}
         loop: "{{ backup_paths }}"
-        args:
-          no_profile: false  # Umgebung des Benutzers laden
         retries: 3
         delay: 10
         register: backup_result
