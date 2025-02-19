@@ -22,6 +22,12 @@
         url: "{{ restic_url }}"
         dest: "{{ restic_install_path }}\\restic.zip"
 
+    - name: Remove existing Restic files before extraction
+      win_shell: |
+        if (Test-Path "{{ restic_install_path }}\\restic.exe") {
+          Remove-Item "{{ restic_install_path }}\\restic.exe" -Force
+        }
+
     - name: Extract Restic binary using PowerShell
       win_shell: |
         Add-Type -AssemblyName System.IO.Compression.FileSystem
