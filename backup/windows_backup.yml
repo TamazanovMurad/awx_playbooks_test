@@ -7,63 +7,44 @@
     backup_repo: "\\\\192.168.72.131\\backup"
     backup_paths:
       - 'C:\Users\ansible'
-      - 'C:\Programme'  # Überprüfen, ob der Pfad auf dem Host existiert (ggf. 'C:\Program Files')
+      - 'C:\Programme'
+
   tasks:
-    - name: Install Chocolatey if not already installed
+    - name: Install Chocolatey
       win_shell: |
-        if (-not (Test-Path "$env:ProgramData\Chocolatey")) {
-          Set-ExecutionPolicy Bypass -Scope Process -Force
-          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-        }
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
       args:
         creates: "C:\\ProgramData\\Chocolatey"
-      register: choco_install
-      ignore_errors: yes  # Temporär, um Fehler zu sehen
-
-    - name: Add Chocolatey to PATH
-      win_path:
-        elements:
-          - "C:\\ProgramData\\chocolatey\\bin"
-        state: present
 
     - name: Install Restic
-      win_chocolatey:
-        name: restic
-        state: present
-        force: yes
+      win_shell: choco install restic -y --force
+      args:
+        creates: "C:\\ProgramData\\chocolatey\\lib\\restic"
 
-    - name: Ensure backup repo network connection
-      win_shell: |
-        net use {{ backup_repo }} /user:backuper kali
+    - name: Map network drive persistently
+      win_shell: net use {{ backup_repo.replace('/', '\\') }} /user:backuper kali /persistent:yes
       args:
         executable: cmd
-      register: net_use
-      ignore_errors: yes
+      register: net_result
+      failed_when: net_result.rc != 0 and 'error 85' not in net_result.stderr  # Ignoriere "Bereits verbunden"
 
-    - name: Initialize repository if not exists
-      win_shell: |
-        restic -r "{{ backup_repo }}" snapshots --password "{{ restic_password }}"
+    - name: Initialize repo only if needed
+      win_shell: restic -r "{{ backup_repo }}" snapshots --password "{{ restic_password }}" || restic -r "{{ backup_repo }}" init --password "{{ restic_password }}"
       args:
         executable: cmd
-      register: repo_check
-      ignore_errors: yes
-      failed_when: false
+      register: init_result
 
-    - name: Run repo init if needed
+    - name: Execute backups with verification
       win_shell: |
-        restic -r "{{ backup_repo }}" init --password "{{ restic_password }}"
-      args:
-        executable: cmd
-      when: repo_check.rc != 0
-
-    - name: Run backups
-      win_shell: |
-        restic backup "{{ item }}" --repo "{{ backup_repo }}" --password "{{ restic_password }}" --verbose
+        restic backup "{{ item }}" --repo "{{ backup_repo }}" --password "{{ restic_password }}"
+        restic check --repo "{{ backup_repo }}" --password "{{ restic_password }}"
       loop: "{{ backup_paths }}"
       args:
         executable: cmd
-      register: backup_output
+      register: backup_results
 
-    - debug:
-        var: backup_output
+    - name: Show backup proof
+      debug:
+        msg: "Last backup snapshot: {{ (backup_results.results[0].stdout_lines | select('match', 'snapshot .* saved') | list)[0] }}"
