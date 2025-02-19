@@ -25,14 +25,11 @@
           - C:\ProgramData\chocolatey\bin
         state: present
 
-    # Geänderter Task mit win_package
     - name: Restic installieren
-      win_package:
-        name: restic
-        path: https://github.com/restic/restic/releases/download/v0.16.0/restic_0.16.0_windows_amd64.zip
-        product_id: restic
-        arguments: /S
-      when: not ansible_check_mode
+      win_shell: |
+        choco install restic -y --force
+      args:
+        executable: cmd
 
     - name: Netzwerkfreigabe verbinden
       win_shell: |
@@ -57,3 +54,39 @@
       args:
         executable: cmd
       register: backup_results
+
+    # AB HIER DIE CHECKS
+    - name: Backup-Ergebnisse validieren
+      debug:
+        msg: |
+          Backup von {{ item.item }}:
+          - Exit Code: {{ item.rc }}
+          - Output: {{ item.stdout_lines }}
+          - Fehler: {{ item.stderr_lines if item.rc != 0 else 'Keine' }}
+      loop: "{{ backup_results.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Snapshots auflisten
+      win_shell: |
+        restic -r "{{ restic_repo }}" snapshots --password "{{ restic_password }}"
+      args:
+        executable: cmd
+      register: snapshots
+      changed_when: false
+
+    - name: Snapshots anzeigen
+      debug:
+        msg: "{{ snapshots.stdout_lines }}"
+
+    - name: Repository-Integrität prüfen
+      win_shell: |
+        restic -r "{{ restic_repo }}" check --password "{{ restic_password }}"
+      args:
+        executable: cmd
+      register: repo_check
+      changed_when: false
+
+    - name: Check-Ergebnis
+      debug:
+        msg: "{{ repo_check.stdout_lines }}"
