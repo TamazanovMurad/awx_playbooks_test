@@ -3,11 +3,13 @@
   hosts: windows
   gather_facts: no
   vars:
-    restic_password: "kali"
+    restic_password: "{{ restic_vault_password }}"  # Aus AWX Vault
     backup_repo: "\\\\192.168.72.131\\backup"
+    smb_username: "{{ smb_vault_username }}"        # Aus AWX Vault
     backup_paths:
       - C:\Users\ansible
       - C:\Programme
+
   tasks:
     - name: Install Chocolatey if not already installed
       win_shell: |
@@ -28,18 +30,76 @@
     - name: Install Restic
       win_shell: |
         choco install restic -y --force
+      args:
+        executable: cmd
 
     - name: Initialize repository with direct credentials
-      win_shell: |
-        net use {{ backup_repo }} /user:backuper kali
-        restic -r "{{ backup_repo }}" init --password "{{ restic_password }}"
-      args:
-        executable: cmd
+      block:
+        - name: Connect network share
+          win_shell: |
+            net use {{ backup_repo }} /user:{{ smb_username }} "{{ restic_password }}" /persistent:no
+          args:
+            executable: cmd
+          register: net_connect
+          failed_when: net_connect.rc not in [0, 2]
+
+        - name: Init repository
+          win_shell: |
+            restic -r "{{ backup_repo }}" init --password "{{ restic_password }}"
+          args:
+            executable: cmd
+          register: init_result
+          changed_when: "'already initialized' not in init_result.stderr"
+
+      always:
+        - name: Debug init output
+          debug:
+            var: init_result
 
     - name: Run backups
+      block:
+        - name: Reconnect network share
+          win_shell: |
+            net use {{ backup_repo }} /user:{{ smb_username }} "{{ restic_password }}" /persistent:no
+          args:
+            executable: cmd
+
+        - name: Execute backup
+          win_shell: |
+            restic backup {{ item }} --repo "{{ backup_repo }}" --password "{{ restic_password }}" --verbose
+          loop: "{{ backup_paths }}"
+          args:
+            executable: cmd
+          register: backup_results
+
+      always:
+        - name: Show backup results
+          debug:
+            msg: "Backup {{ item.item }}: {{ 'SUCCESS' if item.rc == 0 else 'FAILED' }}"
+          loop: "{{ backup_results.results }}"
+          loop_control:
+            label: "{{ item.item }}"
+
+    - name: Verify snapshots
       win_shell: |
-        net use {{ backup_repo }} /user:backuper kali
-        restic backup {{ item }} --repo "{{ backup_repo }}" --password "{{ restic_password }}"
-      loop: "{{ backup_paths }}"
+        restic -r "{{ backup_repo }}" snapshots --password "{{ restic_password }}"
       args:
         executable: cmd
+      register: snapshots
+      changed_when: false
+
+    - name: Show snapshots
+      debug:
+        msg: "{{ snapshots.stdout_lines }}"
+
+    - name: Check repository integrity
+      win_shell: |
+        restic -r "{{ backup_repo }}" check --password "{{ restic_password }}"
+      args:
+        executable: cmd
+      register: integrity_check
+      changed_when: false
+
+    - name: Show integrity check
+      debug:
+        msg: "{{ integrity_check.stdout_lines }}"
