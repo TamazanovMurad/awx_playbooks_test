@@ -33,11 +33,11 @@
   
       - name: Netzwerkfreigabe verbinden
         win_shell: |
-          net use {{ restic_repo }} /user:backuper "{{ restic_password }}" /persistent:no
+          net use {{ restic_repo }} /user:backuper "{{ smb_password }}" /persistent:no
         args:
           executable: cmd
         register: net_use
-        failed_when: net_use.rc not in [0, 2]  # Ignoriert "Bereits verbunden" Fehler
+        failed_when: net_use.rc not in [0, 2]
   
       - name: Repository initialisieren
         win_shell: |
@@ -46,9 +46,6 @@
           executable: cmd
         register: init_repo
         changed_when: "'already initialized' not in init_repo.stderr"
-        failed_when: 
-          - init_repo.rc != 0
-          - "'already initialized' not in init_repo.stderr"
   
       - name: Backup durchführen
         win_shell: |
@@ -57,32 +54,8 @@
         args:
           executable: cmd
         register: backup_results
-        changed_when: "'snapshot .* saved' in backup_results.stdout"
   
-      - name: Backup-Ergebnisse anzeigen
+      - name: Backup-Überprüfung
         debug:
-          var: backup_results.results
-  
-      - name: Snapshots auflisten
-        win_shell: |
-          restic -r "{{ restic_repo }}" snapshots --password "{{ restic_password }}"
-        args:
-          executable: cmd
-        register: snapshots
-        changed_when: false
-  
-      - name: Snapshots anzeigen
-        debug:
-          msg: "{{ snapshots.stdout_lines }}"
-  
-      - name: Repository prüfen
-        win_shell: |
-          restic -r "{{ restic_repo }}" check --password "{{ restic_password }}"
-        args:
-          executable: cmd
-        register: repo_check
-        changed_when: false
-  
-      - name: Check-Ergebnis anzeigen
-        debug:
-          msg: "{{ repo_check.stdout_lines }}"
+          msg: "Backup von {{ item.item }} erfolgreich: {{ 'Snapshot erstellt' if 'snapshot saved' in item.stdout else 'Fehler' }}"
+        loop: "{{ backup_results.results }}"
