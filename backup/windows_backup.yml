@@ -4,7 +4,7 @@
     gather_facts: no
     vars:
       restic_password: "kali"
-      backup_repo: "local:\\\\192.168.72.131\\backup"
+      backup_repo: "local:Z:"
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
@@ -29,22 +29,26 @@
         win_shell: |
           choco install restic -y --force
   
-      - name: Store SMB credentials explicitly
+      - name: Initialize repository with direct drive mapping
         win_shell: |
-          cmdkey /add:192.168.72.131 /user:backuper /pass:kali
-  
-      - name: Ensure repository is initialized
-        win_shell: |
+          net use Z: \\192.168.72.131\backup /user:backuper kali
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
-          restic -r "{{ backup_repo }}" snapshots 2>$null
+          restic -r {{ backup_repo }} snapshots 2>$null
           if ($LASTEXITCODE -ne 0) {
-            restic -r "{{ backup_repo }}" init
+            restic -r {{ backup_repo }} init
           }
+          net use Z: /delete
+        args:
+          executable: cmd
         register: repo_init_result
         ignore_errors: yes
   
-      - name: Run Restic Backup
+      - name: Execute backup with temporary drive mapping
         win_shell: |
+          net use Z: \\192.168.72.131\backup /user:backuper kali
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
-          restic backup {{ item }} --repo "{{ backup_repo }}"
+          restic backup {{ item }} --repo {{ backup_repo }}
+          net use Z: /delete
         loop: "{{ backup_paths }}"
+        args:
+          executable: cmd
