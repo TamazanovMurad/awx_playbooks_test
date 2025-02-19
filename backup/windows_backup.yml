@@ -1,0 +1,21 @@
+---
+- name: Backup Windows Hosts
+  hosts: windows
+  gather_facts: no
+  vars:
+    restic_password: "kali"
+    backup_repo: "\\\\192.168.72.131\\mnt\\backup\\repo"
+    backup_paths:
+      - C:\Benutzer
+      - C:\Programme
+  tasks:
+    - name: Ensure Restic is installed
+      win_chocolatey:
+        name: restic
+        state: present
+
+    - name: Run Restic Backup
+      win_shell: |
+        $env:RESTIC_PASSWORD = "{{ restic_password }}"
+        restic backup {{ item }} --repo {{ backup_repo }}
+      loop: "{{ backup_paths }}"

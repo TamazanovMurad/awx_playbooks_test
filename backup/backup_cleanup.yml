@@ -1,0 +1,22 @@
+---
+- name: Cleanup old backups
+  hosts: backup_server
+  become: yes
+  vars:
+    restic_password: "kali"
+    backup_repo: "/mnt/backup/repo"
+  tasks:
+    - name: Remove old snapshots
+      shell: |
+        export RESTIC_PASSWORD="{{ restic_password }}"
+        restic forget \
+          --keep-daily 7 \
+          --keep-weekly 4 \
+          --keep-monthly 12 \
+          --prune \
+          --repo {{ backup_repo }}
+
+    - name: Check Backup Integrity
+      shell: |
+        export RESTIC_PASSWORD="{{ restic_password }}"
+        restic check --repo {{ backup_repo }}

@@ -1,0 +1,29 @@
+---
+- name: Backup Linux Hosts
+  hosts: linux
+  become: yes
+  vars:
+    restic_password: "kali"
+    backup_repo: "/mnt/backup/repo"
+    backup_paths:
+      - /home
+      - /etc
+      - /var/log
+  tasks:
+    - name: Ensure Restic is installed (Debian/Ubuntu)
+      apt:
+        name: restic
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Ensure Restic is installed (RHEL/CentOS)
+      yum:
+        name: restic
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Run Restic Backup
+      shell: |
+        export RESTIC_PASSWORD="{{ restic_password }}"
+        restic backup {{ item }} --repo {{ backup_repo }}
+      loop: "{{ backup_paths }}"
