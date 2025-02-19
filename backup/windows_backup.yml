@@ -4,7 +4,7 @@
     gather_facts: no
     vars:
       restic_password: "kali"
-      backup_repo: "smb://backuper:kali@192.168.72.131/backup"
+      backup_repo: "local:\\\\192.168.72.131\\backup"
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
@@ -29,6 +29,10 @@
         win_shell: |
           choco install restic -y --force
   
+      - name: Store SMB credentials explicitly
+        win_shell: |
+          cmdkey /add:192.168.72.131 /user:backuper /pass:kali
+  
       - name: Ensure repository is initialized
         win_shell: |
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
@@ -44,7 +48,3 @@
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
           restic backup {{ item }} --repo "{{ backup_repo }}"
         loop: "{{ backup_paths }}"
-        retries: 3
-        delay: 10
-        register: backup_result
-        until: backup_result.rc == 0
