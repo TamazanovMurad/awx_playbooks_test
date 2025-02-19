@@ -4,7 +4,7 @@
     gather_facts: no
     vars:
       restic_password: "kali"
-      backup_repo: "local:\\\\192.168.72.131\\backup"  # Korrekte Syntax für UNC-Pfade
+      backup_repo: "\\\\192.168.72.131\\backup"
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
@@ -29,22 +29,42 @@
         win_shell: |
           choco install restic -y --force
   
-      - name: Ensure repository access with credentials
-        win_shell: |
-          net use \\192.168.72.131\backup /user:backuper kali
-        args:
-          executable: cmd  # CMD statt PowerShell für stabile Netzwerkverbindung
+      - name: Configure backup repository with explicit credentials
+        block:
+          - name: Add credentials with PowerShell
+            win_shell: |
+              $securePass = ConvertTo-SecureString "kali" -AsPlainText -Force
+              New-PSDrive -Name Z -PSProvider FileSystem -Root "\\192.168.72.131\backup" -Persist -Credential (New-Object System.Management.Automation.PSCredential("backuper", $securePass))
+            args:
+              executable: powershell
   
-      - name: Initialize repository (PowerShell-kompatibel)
-        win_shell: |
-          $env:RESTIC_PASSWORD = "{{ restic_password }}"
-          restic -r "{{ backup_repo }}" snapshots 2>$null
-          if ($LASTEXITCODE -ne 0) { restic -r "{{ backup_repo }}" init }
-        args:
-          executable: powershell  # Explizite PowerShell-Ausführung
+          - name: Initialize repository as user
+            win_shell: |
+              $env:RESTIC_PASSWORD = "{{ restic_password }}"
+              restic -r Z:\ init
+            become: yes
+            become_method: runas
+            become_user: backuper
+            become_flags: logon_type=new_credentials
+            args:
+              executable: cmd
   
-      - name: Run backups
+        always:
+          - name: Remove PSDrive
+            win_shell: |
+              Remove-PSDrive -Name Z -Force
+            args:
+              executable: powershell
+            ignore_errors: yes
+  
+      - name: Execute backups with user context
         win_shell: |
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
           restic backup {{ item }} --repo "{{ backup_repo }}"
         loop: "{{ backup_paths }}"
+        become: yes
+        become_method: runas
+        become_user: backuper
+        become_flags: logon_type=new_credentials
+        args:
+          executable: cmd
