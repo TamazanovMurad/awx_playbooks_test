@@ -8,8 +8,9 @@
     backup_paths:
       - C:\Users\ansible
       - C:\Programme
+
   tasks:
-    - name: Install Chocolatey if not already installed
+    - name: Install Chocolatey
       win_shell: |
         if (-not (Test-Path "$env:ProgramData\Chocolatey")) {
           Set-ExecutionPolicy Bypass -Scope Process -Force
@@ -18,6 +19,8 @@
         }
       args:
         creates: "C:\\ProgramData\\Chocolatey"
+      register: choco_install
+      changed_when: "'Chocolatey installed' in choco_install.stdout"
 
     - name: Add Chocolatey to PATH
       win_path:
@@ -28,18 +31,81 @@
     - name: Install Restic
       win_shell: |
         choco install restic -y --force
-
-    - name: Initialize repository with direct credentials
-      win_shell: |
-        net use {{ backup_repo }} /user:backuper kali
-        restic -r "{{ backup_repo }}" init --password "{{ restic_password }}"
       args:
         executable: cmd
+      register: restic_install
+      changed_when: "'restic' in restic_install.stdout"
 
-    - name: Run backups
-      win_shell: |
-        net use {{ backup_repo }} /user:backuper kali
-        restic backup {{ item }} --repo "{{ backup_repo }}" --password "{{ restic_password }}"
-      loop: "{{ backup_paths }}"
-      args:
-        executable: cmd
+    - name: Configure Repository
+      block:
+        - name: Connect SMB Share
+          win_shell: |
+            net use {{ backup_repo }} /user:backuper kali /persistent:no
+          args:
+            executable: cmd
+          register: net_connect
+          failed_when: net_connect.rc not in [0, 2]
+
+        - name: Force Repository Initialization
+          win_shell: |
+            restic -r "{{ backup_repo }}" init --password "{{ restic_password }}" || exit 0
+          args:
+            executable: cmd
+          register: repo_init
+          changed_when: "'already initialized' not in repo_init.stderr"
+
+      rescue:
+        - name: Handle Repository Error
+          debug:
+            msg: "KRITISCHER FEHLER: Repository konnte nicht initialisiert werden!"
+          failed_when: true
+
+    - name: Execute Backups
+      block:
+        - name: Verify SMB Connection
+          win_shell: |
+            net use {{ backup_repo }} /user:backuper kali
+          args:
+            executable: cmd
+
+        - name: Run Restic Backup
+          win_shell: |
+            restic backup "{{ item }}" --repo "{{ backup_repo }}" --password "{{ restic_password }}" --verbose
+          loop: "{{ backup_paths }}"
+          args:
+            executable: cmd
+          register: backup_results
+          failed_when: 
+            - "'snapshot .* saved' not in backup_results.stdout"
+            - backup_results.rc != 0
+
+      rescue:
+        - name: Handle Backup Failure
+          debug:
+            msg: "BACKUP FEHLGESCHLAGEN: {{ item.item }}"
+          loop: "{{ backup_results.results }}"
+          loop_control:
+            label: "{{ item.item }}"
+          failed_when: true
+
+    - name: Final Verification
+      block:
+        - name: List Snapshots
+          win_shell: |
+            restic -r "{{ backup_repo }}" snapshots --password "{{ restic_password }}"
+          args:
+            executable: cmd
+          register: snapshots
+          failed_when: "'no snapshot found' in snapshots.stdout"
+
+        - name: Show Snapshots
+          debug:
+            msg: "Erfolgreiche Snapshots: {{ snapshots.stdout_lines }}"
+      
+      always:
+        - name: Cleanup Network
+          win_shell: |
+            net use {{ backup_repo }} /delete /y
+          args:
+            executable: cmd
+          ignore_errors: yes
