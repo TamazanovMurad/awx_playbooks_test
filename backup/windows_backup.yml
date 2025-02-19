@@ -38,10 +38,10 @@
       - name: Ensure repository is initialized
         win_shell: |
           $Username = "backuper"
-          $Password = "kali" | ConvertTo-SecureString -AsPlainText -Force
-          $Credential = New-Object System.Management.Automation.PSCredential($Username, $Password)
-          net use \\192.168.72.131\backup /user:$Username $Password
+          $Password = "kali"
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
+          $env:USERNAME = $Username
+          $env:PASSWORD = $Password
           if (-not (restic -r {{ backup_repo }} snapshots 2>$null)) {
               restic -r {{ backup_repo }} init
           }
@@ -55,9 +55,9 @@
       - name: Run Restic Backup
         win_shell: |
           $Username = "backuper"
-          $Password = "kali" | ConvertTo-SecureString -AsPlainText -Force
-          $Credential = New-Object System.Management.Automation.PSCredential($Username, $Password)
-          net use \\192.168.72.131\backup /user:$Username $Password
+          $Password = "kali"
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
+          $env:USERNAME = $Username
+          $env:PASSWORD = $Password
           restic backup {{ item }} --repo {{ backup_repo }}
         loop: "{{ backup_paths }}"
