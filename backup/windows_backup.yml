@@ -4,7 +4,7 @@
     gather_facts: no
     vars:
       restic_password: "kali"
-      backup_repo: "\\\\192.168.72.131\\backup"  # Direkter UNC-Pfad
+      backup_repo: "local:\\\\192.168.72.131\\backup"  # Korrekte Syntax für UNC-Pfade
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
@@ -29,23 +29,22 @@
         win_shell: |
           choco install restic -y --force
   
-      - name: Ensure repository access
+      - name: Ensure repository access with credentials
         win_shell: |
-          net use {{ backup_repo }} /user:backuper kali
+          net use \\192.168.72.131\backup /user:backuper kali
         args:
-          executable: cmd
+          executable: cmd  # CMD statt PowerShell für stabile Netzwerkverbindung
   
-      - name: Initialize repository if needed
+      - name: Initialize repository (PowerShell-kompatibel)
         win_shell: |
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
-          restic -r "{{ backup_repo }}" snapshots || restic -r "{{ backup_repo }}" init
+          restic -r "{{ backup_repo }}" snapshots 2>$null
+          if ($LASTEXITCODE -ne 0) { restic -r "{{ backup_repo }}" init }
         args:
-          executable: cmd
+          executable: powershell  # Explizite PowerShell-Ausführung
   
       - name: Run backups
         win_shell: |
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
           restic backup {{ item }} --repo "{{ backup_repo }}"
         loop: "{{ backup_paths }}"
-        args:
-          executable: cmd
