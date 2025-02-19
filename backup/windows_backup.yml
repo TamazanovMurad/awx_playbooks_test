@@ -4,7 +4,7 @@
     gather_facts: no
     vars:
       restic_password: "kali"
-      backup_repo: "Z:"  # Verwende gemapptes Laufwerk
+      backup_repo: "Z:"  # Gemapptes Laufwerk
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
@@ -25,9 +25,9 @@
             - "C:\\ProgramData\\chocolatey\\bin"
           state: present
   
-      - name: Install Restic 0.16.5 using Chocolatey
+      - name: Install latest Restic using Chocolatey
         win_shell: |
-          choco install restic --version=0.16.5 -y --force
+          choco install restic -y --force
   
       - name: Map network drive with credentials
         win_shell: |
@@ -61,10 +61,3 @@
         become_method: runas
         become_user: backuper
         become_flags: logon_type=new_credentials logon_flags=netcredentials_only
-  
-      - name: Disconnect network drive (optional)
-        win_shell: |
-          net use Z: /delete
-        args:
-          executable: cmd
-        when: false  # Auf "true" setzen falls gewünscht
