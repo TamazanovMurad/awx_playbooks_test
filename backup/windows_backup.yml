@@ -1,63 +1,61 @@
 ---
-- name: Backup Windows Hosts
-  hosts: windows
-  gather_facts: no
-  vars:
-    restic_password: "kali"  # RESTIC-Passwort
-    backup_repo: "\\\\192.168.72.131\\backup"  # Verwende den UNC-Pfad
-    backup_paths:
-      - C:\Users
-      - C:\Programme
-  tasks:
-    - name: Install Chocolatey if not already installed
-      win_shell: |
-        if (-not (Test-Path "$env:ProgramData\Chocolatey")) {
-          Set-ExecutionPolicy Bypass -Scope Process -Force
-          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-          Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-        }
-      args:
-        creates: "C:\\ProgramData\\Chocolatey"
-
-    - name: Add Chocolatey to PATH
-      win_path:
-        elements:
-          - "C:\\ProgramData\\chocolatey\\bin"
-        state: present
-
-    - name: Install Restic using Chocolatey
-      win_shell: |
-        choco install restic -y --force
-
-    - name: Add Restic to PATH
-      win_path:
-        elements:
-          - "C:\\ProgramData\\chocolatey\\bin"
-        state: present
-
-    - name: Ensure repository is initialized
-      win_shell: |
-        $Username = "backuper"
-        $Password = "kali" | ConvertTo-SecureString -AsPlainText -Force
-        $Credential = New-Object System.Management.Automation.PSCredential($Username, $Password)
-        $env:RESTIC_PASSWORD = "{{ restic_password }}"
-        net use \\192.168.72.131\backup /user:$Username $Password
-        if (-not (restic -r {{ backup_repo }} snapshots 2>$null)) {
-            restic -r {{ backup_repo }} init
-        }
-      register: repo_init_result
-      ignore_errors: yes
-
-    - name: Debug repository initialization result
-      debug:
-        var: repo_init_result.stdout_lines
-
-    - name: Run Restic Backup
-      win_shell: |
-        $Username = "backuper"
-        $Password = "kali" | ConvertTo-SecureString -AsPlainText -Force
-        $Credential = New-Object System.Management.Automation.PSCredential($Username, $Password)
-        $env:RESTIC_PASSWORD = "{{ restic_password }}"
-        net use \\192.168.72.131\backup /user:$Username $Password
-        restic backup {{ item }} --repo {{ backup_repo }}
-      loop: "{{ backup_paths }}"
+  - name: Backup Windows Hosts
+    hosts: windows
+    gather_facts: no
+    vars:
+      restic_password: "kali"  # RESTIC-Passwort
+      backup_repo: "\\\\192.168.72.131\\backup"  # Verwende den UNC-Pfad
+      backup_paths:
+        - C:\Users\ansible
+        - C:\Programme
+    tasks:
+      - name: Install Chocolatey if not already installed
+        win_shell: |
+          if (-not (Test-Path "$env:ProgramData\Chocolatey")) {
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+            Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+          }
+        args:
+          creates: "C:\\ProgramData\\Chocolatey"
+  
+      - name: Add Chocolatey to PATH
+        win_path:
+          elements:
+            - "C:\\ProgramData\\chocolatey\\bin"
+          state: present
+  
+      - name: Install Restic using Chocolatey
+        win_shell: |
+          choco install restic -y --force
+  
+      - name: Add Restic to PATH
+        win_path:
+          elements:
+            - "C:\\ProgramData\\chocolatey\\bin"
+          state: present
+  
+      - name: Ensure repository is initialized
+        win_shell: |
+          $Username = "backuper"
+          $Password = "kali" | ConvertTo-SecureString -AsPlainText -Force
+          $Credential = New-Object System.Management.Automation.PSCredential($Username, $Password)
+          $env:RESTIC_PASSWORD = "{{ restic_password }}"
+          if (-not (restic -r {{ backup_repo }} snapshots 2>$null)) {
+              restic -r {{ backup_repo }} init
+          }
+        register: repo_init_result
+        ignore_errors: yes
+  
+      - name: Debug repository initialization result
+        debug:
+          var: repo_init_result.stdout_lines
+  
+      - name: Run Restic Backup
+        win_shell: |
+          $Username = "backuper"
+          $Password = "kali" | ConvertTo-SecureString -AsPlainText -Force
+          $Credential = New-Object System.Management.Automation.PSCredential($Username, $Password)
+          $env:RESTIC_PASSWORD = "{{ restic_password }}"
+          restic backup {{ item }} --repo {{ backup_repo }}
+        loop: "{{ backup_paths }}"
