@@ -3,11 +3,14 @@
     hosts: windows
     gather_facts: no
     vars:
-      restic_password: "kali"  # RESTIC-Passwort
-      backup_repo: "\\\\192.168.72.131\\backup"  # Verwende den UNC-Pfad
+      restic_password: "kali"
+      backup_repo: "\\\\192.168.72.131\\backup"
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
+      smb_username: "backuper"  # SMB share username
+      smb_password: "kali"      # SMB share password
+    
     tasks:
       - name: Install Chocolatey if not already installed
         win_shell: |
@@ -35,29 +38,41 @@
             - "C:\\ProgramData\\chocolatey\\bin"
           state: present
   
+      # Map network drive with proper credentials
+      - name: Map network drive
+        win_shell: |
+          $Username = "{{ smb_username }}"
+          $Password = ConvertTo-SecureString "{{ smb_password }}" -AsPlainText -Force
+          $Cred = New-Object System.Management.Automation.PSCredential ($Username, $Password)
+          
+          # Remove existing connection if any
+          Remove-PSDrive -Name "Z" -Force -ErrorAction SilentlyContinue
+          
+          # Map network drive
+          New-PSDrive -Name "Z" -PSProvider FileSystem -Root "{{ backup_repo }}" -Credential $Cred -Persist
+        ignore_errors: yes
+  
       - name: Ensure repository is initialized
         win_shell: |
-          $Username = "backuper"
-          $Password = "kali"
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
-          $env:USERNAME = $Username
-          $env:PASSWORD = $Password
-          if (-not (restic -r {{ backup_repo }} snapshots 2>$null)) {
-              restic -r {{ backup_repo }} init
+          if (-not (restic -r Z: snapshots 2>$null)) {
+              restic -r Z: init
           }
         register: repo_init_result
         ignore_errors: yes
   
       - name: Debug repository initialization result
         debug:
-          var: repo_init_result.stdout_lines
+          var: repo_init_result
   
       - name: Run Restic Backup
         win_shell: |
-          $Username = "backuper"
-          $Password = "kali"
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
-          $env:USERNAME = $Username
-          $env:PASSWORD = $Password
-          restic backup {{ item }} --repo {{ backup_repo }}
+          restic backup {{ item }} --repo Z:
         loop: "{{ backup_paths }}"
+  
+      # Cleanup network drive mapping
+      - name: Remove network drive mapping
+        win_shell: |
+          Remove-PSDrive -Name "Z" -Force -ErrorAction SilentlyContinue
+        ignore_errors: yes
