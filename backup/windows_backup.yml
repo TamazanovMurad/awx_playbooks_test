@@ -4,7 +4,7 @@
     gather_facts: no
     vars:
       restic_password: "kali"
-      backup_repo: "local:Z:"
+      backup_repo: "local:\\\\192.168.72.131\\backup"
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
@@ -29,48 +29,48 @@
         win_shell: |
           choco install restic -y --force
   
-      - name: Initialize repository with drive mapping
+      - name: Initialize repository with direct UNC path
         block:
-          - name: Map network drive
+          - name: Add network credentials
             win_shell: |
-              net use Z: \\192.168.72.131\backup /user:backuper kali
+              net use \\192.168.72.131\backup /user:backuper kali
             args:
               executable: cmd
   
           - name: Run repository initialization
             win_shell: |
               $env:RESTIC_PASSWORD = "{{ restic_password }}"
-              restic -r {{ backup_repo }} snapshots 2>$null
+              restic -r "{{ backup_repo }}" snapshots 2>$null
               if ($LASTEXITCODE -ne 0) {
-                restic -r {{ backup_repo }} init
+                restic -r "{{ backup_repo }}" init
               }
   
         always:
-          - name: Unmap network drive
+          - name: Cleanup network connection
             win_shell: |
-              net use Z: /delete /y
+              net use \\192.168.72.131\backup /delete /y
             args:
               executable: cmd
             ignore_errors: yes
   
       - name: Execute backups
         block:
-          - name: Map network drive for backup
+          - name: Establish network connection
             win_shell: |
-              net use Z: \\192.168.72.131\backup /user:backuper kali
+              net use \\192.168.72.131\backup /user:backuper kali
             args:
               executable: cmd
   
           - name: Run restic backup
             win_shell: |
               $env:RESTIC_PASSWORD = "{{ restic_password }}"
-              restic backup {{ item }} --repo {{ backup_repo }}
+              restic backup {{ item }} --repo "{{ backup_repo }}"
             loop: "{{ backup_paths }}"
   
         always:
-          - name: Cleanup network drive
+          - name: Remove network connection
             win_shell: |
-              net use Z: /delete /y
+              net use \\192.168.72.131\backup /delete /y
             args:
               executable: cmd
             ignore_errors: yes
