@@ -5,13 +5,32 @@
   vars:
     restic_password: "kali"
     backup_repo: "\\\\192.168.72.131\\mnt\\backup\\repo"
+    restic_url: "https://github.com/restic/restic/releases/download/v0.15.1/restic_0.15.1_windows_amd64.zip"
+    restic_install_path: "C:\\Program Files\\Restic"
     backup_paths:
       - C:\Benutzer
       - C:\Programme
   tasks:
-    - name: Ensure Restic is installed
-      win_chocolatey:
-        name: restic
+    - name: Create Restic installation directory
+      win_file:
+        path: "{{ restic_install_path }}"
+        state: directory
+
+    - name: Download Restic binary
+      win_get_url:
+        url: "{{ restic_url }}"
+        dest: "{{ restic_install_path }}\\restic.zip"
+
+    - name: Extract Restic binary
+      win_unzip:
+        src: "{{ restic_install_path }}\\restic.zip"
+        dest: "{{ restic_install_path }}"
+        creates: "{{ restic_install_path }}\\restic.exe"
+
+    - name: Add Restic to PATH
+      win_path:
+        elements:
+          - "{{ restic_install_path }}"
         state: present
 
     - name: Run Restic Backup
