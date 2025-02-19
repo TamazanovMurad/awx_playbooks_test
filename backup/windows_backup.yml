@@ -28,10 +28,9 @@
           Remove-Item "{{ restic_install_path }}\\restic.exe" -Force
         }
 
-    - name: Extract Restic binary using PowerShell
+    - name: Extract Restic binary using Expand-Archive
       win_shell: |
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        [System.IO.Compression.ZipFile]::ExtractToDirectory("{{ restic_install_path }}\\restic.zip", "{{ restic_install_path }}")
+        Expand-Archive -Path "{{ restic_install_path }}\\restic.zip" -DestinationPath "{{ restic_install_path }}" -Force
 
     - name: Add Restic to PATH
       win_path:
