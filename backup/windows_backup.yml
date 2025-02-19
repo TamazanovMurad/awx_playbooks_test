@@ -7,9 +7,24 @@
     backup_repo: "\\\\192.168.72.131\\backup"
     backup_paths:
       - 'C:\Users\ansible'
-      - 'C:\Program Files'  # Korrigierter Pfad für englische Systeme
+      - 'C:\Program Files'  # Korrigierter Standardpfad
 
   tasks:
+    - name: Install Chocolatey
+      win_shell: |
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+      args:
+        creates: "C:\\ProgramData\\Chocolatey"
+      when: not ansible_check_mode
+
+    - name: Install Restic via Chocolatey
+      win_chocolatey:
+        name: restic
+        state: present
+        force: yes
+
     - name: Map network drive
       win_shell: |
         net use "{{ backup_repo }}" /user:backuper kali /persistent:yes
@@ -18,18 +33,22 @@
       register: net_use
       failed_when: net_use.rc != 0 and 'error 85' not in net_use.stderr
 
-    - name: Validate repository connection
+    - name: Check repository exists
       win_shell: |
-        restic -r "{{ backup_repo }}" --password "{{ restic_password }}" snapshots
+        restic -r "{{ backup_repo }}" snapshots
+      environment:
+        RESTIC_PASSWORD: "{{ restic_password }}"
       args:
         executable: cmd
       register: repo_check
       ignore_errors: yes
       changed_when: false
 
-    - name: Force repository initialization
+    - name: Initialize repository if needed
       win_shell: |
-        restic -r "{{ backup_repo }}" --password "{{ restic_password }}" init
+        restic -r "{{ backup_repo }}" init
+      environment:
+        RESTIC_PASSWORD: "{{ restic_password }}"
       args:
         executable: cmd
       when: repo_check.rc != 0
@@ -38,24 +57,28 @@
       block:
         - name: Execute backup
           win_shell: |
-            restic backup "{{ item }}" --repo "{{ backup_repo }}" --password "{{ restic_password }}" --verbose
+            restic backup "{{ item }}" --repo "{{ backup_repo }}" --verbose
+          environment:
+            RESTIC_PASSWORD: "{{ restic_password }}"
           args:
             executable: cmd
           loop: "{{ backup_paths }}"
           register: backup_results
 
-        - name: Verify backup
+        - name: List snapshots
           win_shell: |
-            restic -r "{{ backup_repo }}" --password "{{ restic_password }}" snapshots
+            restic -r "{{ backup_repo }}" snapshots
+          environment:
+            RESTIC_PASSWORD: "{{ restic_password }}"
           args:
             executable: cmd
           register: snapshots
 
         - name: Show backup proof
           debug:
-            var: snapshots.stdout_lines
+            msg: "Latest snapshot: {{ snapshots.stdout_lines | select('match', '^[a-f0-9]+') | list }}"
 
       rescue:
-        - name: Capture backup error
+        - name: Show backup error
           debug:
-            msg: "BACKUP FAILED: {{ backup_results.results | map(attribute='stderr') | list }}"
+            msg: "Backup failed: {{ backup_results.msg }}"
