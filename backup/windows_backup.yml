@@ -4,7 +4,7 @@
     gather_facts: no
     vars:
       restic_password: "kali"
-      backup_repo: "local:\\\\192.168.72.131\\backup"
+      backup_repo: "//192.168.72.131/backup"
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
@@ -29,48 +29,33 @@
         win_shell: |
           choco install restic -y --force
   
-      - name: Initialize repository with direct UNC path
+      - name: Configure Restic repository with SMB
         block:
-          - name: Add network credentials
+          - name: Mount SMB share temporarily
             win_shell: |
-              net use \\192.168.72.131\backup /user:backuper kali
+              net use T: \\192.168.72.131\backup /user:backuper kali
             args:
               executable: cmd
   
-          - name: Run repository initialization
+          - name: Initialize Restic repository
             win_shell: |
               $env:RESTIC_PASSWORD = "{{ restic_password }}"
-              restic -r "{{ backup_repo }}" snapshots 2>$null
-              if ($LASTEXITCODE -ne 0) {
-                restic -r "{{ backup_repo }}" init
-              }
+              restic -r "local:T:" init
+            args:
+              executable: cmd
   
         always:
-          - name: Cleanup network connection
+          - name: Unmount SMB share
             win_shell: |
-              net use \\192.168.72.131\backup /delete /y
+              net use T: /delete /y
             args:
               executable: cmd
             ignore_errors: yes
   
-      - name: Execute backups
-        block:
-          - name: Establish network connection
-            win_shell: |
-              net use \\192.168.72.131\backup /user:backuper kali
-            args:
-              executable: cmd
-  
-          - name: Run restic backup
-            win_shell: |
-              $env:RESTIC_PASSWORD = "{{ restic_password }}"
-              restic backup {{ item }} --repo "{{ backup_repo }}"
-            loop: "{{ backup_paths }}"
-  
-        always:
-          - name: Remove network connection
-            win_shell: |
-              net use \\192.168.72.131\backup /delete /y
-            args:
-              executable: cmd
-            ignore_errors: yes
+      - name: Execute backups directly via SMB
+        win_shell: |
+          $env:RESTIC_PASSWORD = "{{ restic_password }}"
+          restic backup {{ item }} --repo "smb://backuper:kali@192.168.72.131/backup"
+        loop: "{{ backup_paths }}"
+        args:
+          executable: cmd
