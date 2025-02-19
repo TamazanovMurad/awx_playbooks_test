@@ -6,18 +6,20 @@
     restic_password: "kali"
     backup_repo: "\\\\192.168.72.131\\backup"
     backup_paths:
-      - C:\Users\ansible
-      - C:\Programme
+      - 'C:\Users\ansible'
+      - 'C:\Programme'  # Überprüfen, ob der Pfad auf dem Host existiert (ggf. 'C:\Program Files')
   tasks:
     - name: Install Chocolatey if not already installed
       win_shell: |
         if (-not (Test-Path "$env:ProgramData\Chocolatey")) {
           Set-ExecutionPolicy Bypass -Scope Process -Force
           [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-          Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
         }
       args:
         creates: "C:\\ProgramData\\Chocolatey"
+      register: choco_install
+      ignore_errors: yes  # Temporär, um Fehler zu sehen
 
     - name: Add Chocolatey to PATH
       win_path:
@@ -26,20 +28,42 @@
         state: present
 
     - name: Install Restic
-      win_shell: |
-        choco install restic -y --force
+      win_chocolatey:
+        name: restic
+        state: present
+        force: yes
 
-    - name: Initialize repository with direct credentials
+    - name: Ensure backup repo network connection
       win_shell: |
         net use {{ backup_repo }} /user:backuper kali
+      args:
+        executable: cmd
+      register: net_use
+      ignore_errors: yes
+
+    - name: Initialize repository if not exists
+      win_shell: |
+        restic -r "{{ backup_repo }}" snapshots --password "{{ restic_password }}"
+      args:
+        executable: cmd
+      register: repo_check
+      ignore_errors: yes
+      failed_when: false
+
+    - name: Run repo init if needed
+      win_shell: |
         restic -r "{{ backup_repo }}" init --password "{{ restic_password }}"
       args:
         executable: cmd
+      when: repo_check.rc != 0
 
     - name: Run backups
       win_shell: |
-        net use {{ backup_repo }} /user:backuper kali
-        restic backup {{ item }} --repo "{{ backup_repo }}" --password "{{ restic_password }}"
+        restic backup "{{ item }}" --repo "{{ backup_repo }}" --password "{{ restic_password }}" --verbose
       loop: "{{ backup_paths }}"
       args:
         executable: cmd
+      register: backup_output
+
+    - debug:
+        var: backup_output
