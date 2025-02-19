@@ -4,7 +4,7 @@
     gather_facts: no
     vars:
       restic_password: "kali"
-      backup_repo: "Z:"  # Gemapptes Laufwerk
+      backup_repo: "Z:"
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
@@ -35,29 +35,25 @@
         args:
           executable: cmd
         register: drive_map
-        failed_when: drive_map.rc not in [0, 2]  # Ignoriert Fehler wenn Laufwerk bereits gemappt ist
+        failed_when: drive_map.rc not in [0, 2]
   
       - name: Ensure repository is initialized
         win_shell: |
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
           restic -r {{ backup_repo }} snapshots 2>$null || restic -r {{ backup_repo }} init
-        become: yes
-        become_method: runas
-        become_user: backuper
-        become_flags: logon_type=new_credentials logon_flags=netcredentials_only
+        args:
+          no_profile: false  # Wichtig für Umgebungsvariablen
         register: repo_init_result
         ignore_errors: yes
-  
-      - name: Debug repository initialization
-        debug:
-          var: repo_init_result
   
       - name: Run Restic Backup
         win_shell: |
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
           restic backup {{ item }} --repo {{ backup_repo }}
         loop: "{{ backup_paths }}"
-        become: yes
-        become_method: runas
-        become_user: backuper
-        become_flags: logon_type=new_credentials logon_flags=netcredentials_only
+        args:
+          no_profile: false  # Umgebung des Benutzers laden
+        retries: 3
+        delay: 10
+        register: backup_result
+        until: backup_result.rc == 0
