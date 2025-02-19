@@ -3,8 +3,8 @@
   hosts: windows
   gather_facts: no
   vars:
-    restic_password: "kali"
-    backup_repo: "Z:"  # Verwende den eingebundenen Netzlaufwerksbuchstaben
+    restic_password: "kali"  # RESTIC-Passwort
+    backup_repo: "Z:"        # Verwende den eingebundenen Netzlaufwerksbuchstaben
     backup_paths:
       - C:\Users
       - C:\Programme
@@ -39,7 +39,7 @@
       win_shell: |
         cmdkey /add:192.168.72.131 /user:backuper /pass:kali
       args:
-        creates: "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\Connections\Credentials"
+        creates: 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\Connections\Credentials'
 
     - name: Mount network drive with credentials
       win_shell: |
