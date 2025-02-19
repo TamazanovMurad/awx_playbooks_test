@@ -1,3 +1,5 @@
 collections:
   - name: ansible.windows  # Für Windows-Module (z. B. win_chocolatey)
   - name: community.general  # Optional, für zusätzliche Linux/Allgemeine Module
+  collections:
+  - name: chocolatey.chocolateyb
