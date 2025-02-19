@@ -4,7 +4,7 @@
   gather_facts: no
   vars:
     restic_password: "kali"  # RESTIC-Passwort
-    backup_repo: "local:Z:\\"  # Verwende den eingebundenen Netzlaufwerksbuchstaben mit `local:`-Präfix
+    backup_repo: "\\\\192.168.72.131\\backup"  # Verwende den UNC-Pfad
     backup_paths:
       - C:\Users
       - C:\Programme
@@ -35,17 +35,11 @@
           - "C:\\ProgramData\\chocolatey\\bin"
         state: present
 
-    - name: Mount network drive with credentials
+    - name: Ensure repository is initialized
       win_shell: |
         $Username = "backuper"
         $Password = "kali" | ConvertTo-SecureString -AsPlainText -Force
         $Credential = New-Object System.Management.Automation.PSCredential($Username, $Password)
-        New-PSDrive -Name "Z" -PSProvider FileSystem -Root "\\192.168.72.131\backup" -Credential $Credential -Persist
-      args:
-        creates: "Z:"
-
-    - name: Ensure repository is initialized
-      win_shell: |
         $env:RESTIC_PASSWORD = "{{ restic_password }}"
         if (-not (restic -r {{ backup_repo }} snapshots 2>$null)) {
             restic -r {{ backup_repo }} init
@@ -59,6 +53,9 @@
 
     - name: Run Restic Backup
       win_shell: |
+        $Username = "backuper"
+        $Password = "kali" | ConvertTo-SecureString -AsPlainText -Force
+        $Credential = New-Object System.Management.Automation.PSCredential($Username, $Password)
         $env:RESTIC_PASSWORD = "{{ restic_password }}"
         restic backup {{ item }} --repo {{ backup_repo }}
       loop: "{{ backup_paths }}"
