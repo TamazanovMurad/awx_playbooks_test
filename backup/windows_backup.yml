@@ -35,12 +35,6 @@
           - "C:\\ProgramData\\chocolatey\\bin"
         state: present
 
-    - name: Save network credentials using cmdkey
-      win_shell: |
-        cmdkey /add:192.168.72.131 /user:backuper /pass:kali
-      args:
-        creates: 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\Connections\Credentials'
-
     - name: Mount network drive with credentials
       win_shell: |
         $Username = "backuper"
