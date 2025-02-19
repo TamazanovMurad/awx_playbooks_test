@@ -4,7 +4,7 @@
     gather_facts: no
     vars:
       restic_password: "kali"
-      backup_repo: "\\\\192.168.72.131\\backup"
+      backup_repo: "\\\\192.168.72.131\\backup"  # Original-UNC-Pfad wie im manuellen Befehl
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
@@ -29,19 +29,18 @@
         win_shell: |
           choco install restic -y --force
   
-      - name: Configure backup repository with explicit credentials
+      - name: Configure repository access
         block:
-          - name: Add credentials with PowerShell
+          - name: Add persistent credentials
             win_shell: |
-              $securePass = ConvertTo-SecureString "kali" -AsPlainText -Force
-              New-PSDrive -Name Z -PSProvider FileSystem -Root "\\192.168.72.131\backup" -Persist -Credential (New-Object System.Management.Automation.PSCredential("backuper", $securePass))
+              cmdkey /add:192.168.72.131 /user:backuper /pass:kali
             args:
-              executable: powershell
+              executable: cmd
   
           - name: Initialize repository as user
             win_shell: |
               $env:RESTIC_PASSWORD = "{{ restic_password }}"
-              restic -r Z:\ init
+              restic -r "{{ backup_repo }}" init
             become: yes
             become_method: runas
             become_user: backuper
@@ -49,22 +48,10 @@
             args:
               executable: cmd
   
-        always:
-          - name: Remove PSDrive
-            win_shell: |
-              Remove-PSDrive -Name Z -Force
-            args:
-              executable: powershell
-            ignore_errors: yes
-  
-      - name: Execute backups with user context
+      - name: Run backups
         win_shell: |
           $env:RESTIC_PASSWORD = "{{ restic_password }}"
           restic backup {{ item }} --repo "{{ backup_repo }}"
         loop: "{{ backup_paths }}"
-        become: yes
-        become_method: runas
-        become_user: backuper
-        become_flags: logon_type=new_credentials
         args:
           executable: cmd
