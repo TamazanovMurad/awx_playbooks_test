@@ -6,7 +6,7 @@
     restic_password: "kali"
     backup_repo: "\\\\192.168.72.131\\mnt\\backup\\repo"
     backup_paths:
-      - C:\Benutzer
+      - C:\Benutzer\*
       - C:\Programme
   tasks:
     - name: Install Chocolatey if not already installed
