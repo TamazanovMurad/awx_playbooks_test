@@ -17,7 +17,7 @@
           Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
         }
       args:
-        creates: "$env:ProgramData\Chocolatey"
+        creates: "C:\\ProgramData\\Chocolatey"
 
     - name: Install Restic using Chocolatey
       win_shell: |
