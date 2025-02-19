@@ -33,7 +33,7 @@
 
     - name: Netzwerkfreigabe verbinden
       win_shell: |
-        net use {{ restic_repo }} /user:backuper "{{ smb_password }}" /persistent:no
+        net use {{ restic_repo }} /user:{{ smb_username }} "{{ smb_password }}" /persistent:no
       args:
         executable: cmd
       register: net_use
