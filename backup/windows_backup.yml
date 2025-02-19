@@ -31,21 +31,28 @@
       register: net_result
       failed_when: net_result.rc != 0 and 'error 85' not in net_result.stderr
 
-    - name: Initialize repo only if needed
-      win_shell: restic -r "{{ backup_repo }}" snapshots --password "{{ restic_password }}" || restic -r "{{ backup_repo }}" init --password "{{ restic_password }}"
+    - name: Check if repo exists
+      win_shell: |
+        set "RESTIC_PASSWORD={{ restic_password }}"
+        restic -r "{{ backup_repo }}" snapshots
       args:
         executable: cmd
-      register: init_result
+      register: repo_check
+      ignore_errors: yes
+      changed_when: false
 
-    - name: Execute backups with verification
+    - name: Initialize repository if missing
       win_shell: |
-        restic backup "{{ item }}" --repo "{{ backup_repo }}" --password "{{ restic_password }}"
-        restic check --repo "{{ backup_repo }}" --password "{{ restic_password }}"
+        set "RESTIC_PASSWORD={{ restic_password }}"
+        restic -r "{{ backup_repo }}" init
+      args:
+        executable: cmd
+      when: repo_check.rc != 0
+
+    - name: Execute backups
+      win_shell: |
+        set "RESTIC_PASSWORD={{ restic_password }}"
+        restic backup "{{ item }}" --repo "{{ backup_repo }}"
       loop: "{{ backup_paths }}"
       args:
         executable: cmd
-      register: backup_results
-
-    - name: Show backup proof
-      debug:
-        msg: "Last backup snapshot: {{ (backup_results.results[0].stdout_lines | select('match', 'snapshot .* saved') | list)[0] }}"
