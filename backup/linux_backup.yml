@@ -24,6 +24,13 @@
       when: ansible_os_family == "RedHat"
       become: yes
 
+    - name: Add backup server to known_hosts
+      shell: ssh-keyscan -t ed25519 {{ backup_server_ip }} >> ~/.ssh/known_hosts
+      delegate_to: localhost
+      run_once: true
+      args:
+        executable: /bin/bash
+
     - name: Fetch GPG public key from backup server via SCP
       shell: |
         scp {{ backup_server_user }}@{{ backup_server_ip }}:{{ gpg_pubkey_path }} /tmp/linux_backup.pubkey
