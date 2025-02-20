@@ -3,8 +3,8 @@
   hosts: linux
   gather_facts: yes
   vars:
-    restic_password: "kali"
-    backup_repo: "/mnt/backup/repo"  # Pfad zum Restic-Repository
+    restic_password: "kali"  # Passwort für das Restic-Repository
+    backup_repo: "/mnt/backup/repo"  # Pfad zum Restic-Repository im SMB-Share
     backup_paths:
       - /home
       - /etc
@@ -52,13 +52,21 @@
       debug:
         msg: "{{ mount_check.stdout }}"
 
+    - name: Ensure correct ownership and permissions for backup mount point
+      file:
+        path: /mnt/backup
+        owner: kali  # Stellen Sie sicher, dass der Benutzer "kali" Besitzer ist
+        group: kali  # Stellen Sie sicher, dass die Gruppe "kali" verwendet wird
+        mode: '0700'  # Setzen von strikten Berechtigungen
+      become: yes
+
     - name: Ensure backup repository directory exists
       file:
         path: "{{ backup_repo }}"
         state: directory
-        owner: root
-        group: root
-        mode: '0700'
+        owner: kali  # Stellen Sie sicher, dass der Benutzer "kali" Besitzer ist
+        group: kali  # Stellen Sie sicher, dass die Gruppe "kali" verwendet wird
+        mode: '0700'  # Setzen von strikten Berechtigungen
       become: yes
 
     - name: Initialize Restic repository if not already initialized
