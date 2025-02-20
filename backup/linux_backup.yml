@@ -34,7 +34,9 @@
 
     - name: Source Restic environment variables
       shell: |
+        set -a
         source ~/.restic.env
+        set +a
         echo $RESTIC_PASSWORD
       register: restic_env
       changed_when: false
@@ -56,7 +58,7 @@
         set +a
         restic -r {{ backup_repo }} snapshots || restic -r {{ backup_repo }} init
       args:
-        executable: /bin/bash  # Verwenden Sie explizit Bash
+        executable: /bin/bash
       become: yes
 
     - name: Run backups for specified paths
@@ -64,10 +66,10 @@
         set -a
         source ~/.restic.env
         set +a
-        restic -r {{ backup_repo }} backup {{ item }} --verbose
-      args:
-        executable: /bin/bash  # Verwenden Sie explizit Bash
+        restic -r {{ backup_repo }} backup {{ item }} --verbose --option progress=true
       loop: "{{ backup_paths }}"
+      args:
+        executable: /bin/bash
       become: yes
 
     - name: Verify backups were created
@@ -77,7 +79,7 @@
         set +a
         restic -r {{ backup_repo }} snapshots
       args:
-        executable: /bin/bash  # Verwenden Sie explizit Bash
+        executable: /bin/bash
       register: snapshot_list
       failed_when: snapshot_list.rc != 0
       become: yes
