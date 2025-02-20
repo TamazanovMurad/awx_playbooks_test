@@ -4,7 +4,7 @@
   gather_facts: no
   vars:
     restic_password: "kali"
-    backup_repo: "rest:http://192.168.72.131:8000/repo"  # Beispiel: REST-Server oder NFS-Mount
+    backup_repo: "/mnt/backup"  # Lokaler Mount-Punkt für den SMB-Share
     backup_paths:
       - /home/ansible
       - /var/www
