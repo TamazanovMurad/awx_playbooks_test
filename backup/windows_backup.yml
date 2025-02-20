@@ -37,8 +37,8 @@
       - name: Check if backup repository is already mounted
         win_shell: net use | findstr "{{ backup_repo }}"
         register: repo_check
-        failed_when: false  # Ignorieren nicht-kritische Fehler
-        changed_when: false # Verhindern, dass der Task als "changed" markiert wird
+        failed_when: false
+        changed_when: false
   
       # Debug-Ausgabe des Repository-Checks
       - name: Debug output of repo_check
@@ -51,10 +51,8 @@
         win_command: net use {{ backup_repo }} /user:backuper "{{ restic_password }}"
         register: mount_result
         when: repo_check.rc != 0
-        failed_when: mount_result.rc != 0  # Markieren als fehlgeschlagen, wenn rc != 0
-        changed_when: >
-          "'erfolgreich' in mount_result.stdout.lower() or
-           'successful' in mount_result.stdout.lower()"
+        failed_when: mount_result.rc != 0
+        changed_when: "'erfolgreich' in mount_result.stdout.lower() or 'successful' in mount_result.stdout.lower()"
   
       # Debug-Ausgabe des Mount-Ergebnisses
       - name: Debug output of mount_result
@@ -68,9 +66,15 @@
         register: repo_init_check
         ignore_errors: yes
   
+      - name: Debug output of repo_init_check
+        debug:
+          msg: "Repo init check result: {{ repo_init_check.rc }} - {{ repo_init_check.stderr }}"
+        when: repo_init_check is defined
+  
       - name: Initialize Restic repository
         win_command: restic -r "{{ backup_repo }}" init
         when: repo_init_check.rc != 0
+        failed_when: repo_init_check.rc != 0 and "repository already exists" not in repo_init_check.stderr
   
       # Durchführen der Backups
       - name: Run backups for specified paths
