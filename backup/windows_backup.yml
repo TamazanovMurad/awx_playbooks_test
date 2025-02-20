@@ -60,6 +60,11 @@
           msg: "Mount result: {{ mount_result.stdout }}"
         when: mount_result is defined
   
+      # Cache bereinigen
+      - name: Cleanup Restic cache
+        win_command: restic cache --cleanup
+        ignore_errors: yes
+  
       # Initialisieren des Repositorys, falls noch nicht vorhanden
       - name: Initialize Restic repository if not already initialized
         win_command: restic -r "{{ backup_repo }}" snapshots
