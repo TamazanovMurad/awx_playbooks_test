@@ -4,7 +4,7 @@
     gather_facts: no
     vars:
       restic_password: "kali"
-      backup_repo: "\\\\192.168.72.131\\backup"
+      backup_repo: "\\\\192.168.72.131\\backup"  # Ändern Sie dies optional zu einem lokalen Pfad wie "C:\\restic_backup"
       backup_paths:
         - C:\Users\ansible
         - C:\Programme
