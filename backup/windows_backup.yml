@@ -51,9 +51,7 @@
         win_command: net use {{ backup_repo }} /user:backuper "{{ restic_password }}"
         register: mount_result
         when: repo_check.rc != 0
-        failed_when: >
-          "'erfolgreich' not in mount_result.stdout.lower() and
-           'successful' not in mount_result.stdout.lower()"
+        failed_when: mount_result.rc != 0  # Markieren als fehlgeschlagen, wenn rc != 0
         changed_when: >
           "'erfolgreich' in mount_result.stdout.lower() or
            'successful' in mount_result.stdout.lower()"
