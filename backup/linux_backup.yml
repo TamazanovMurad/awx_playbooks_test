@@ -9,27 +9,16 @@
 
   tasks:
     - name: Ensure required packages are installed (Debian/Ubuntu)
-      apt:
-        name: "{{ item }}"
-        state: present
-      loop:
-        - duplicity
-        - python3-gi
-        - python3-boto3
-        - gnupg
-        - python3-apt  # Hinzugefügt, um das Problem zu beheben
+      shell: |
+        apt update
+        apt install -y duplicity python3-gi python3-boto3 gnupg python3-apt
       when: ansible_os_family == "Debian"
       become: yes
 
     - name: Ensure required packages are installed (RHEL/CentOS)
-      yum:
-        name: "{{ item }}"
-        state: present
-      loop:
-        - duplicity
-        - python3-gobject
-        - python3-boto3
-        - gnupg
+      shell: |
+        yum install -y epel-release
+        yum install -y duplicity python3-gobject python3-boto3 gnupg
       when: ansible_os_family == "RedHat"
       become: yes
 
