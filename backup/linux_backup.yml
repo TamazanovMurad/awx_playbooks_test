@@ -6,7 +6,7 @@
     restic_password: "kali"
     backup_repo: "/mnt/backup"  # Lokaler Mount-Punkt für den SMB-Share
     backup_paths:
-      - /home/ansible
+      - /home/kali
       - /var/www
 
   tasks:
