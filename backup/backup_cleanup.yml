@@ -1,22 +1,39 @@
 ---
-- name: Cleanup old backups
-  hosts: backup_server
-  become: yes
+- name: Cleanup and Prune Old Backups
+  hosts: localhost
+  gather_facts: no
   vars:
     restic_password: "kali"
-    backup_repo: "/mnt/backup/repo"
-  tasks:
-    - name: Remove old snapshots
-      shell: |
-        export RESTIC_PASSWORD="{{ restic_password }}"
-        restic forget \
-          --keep-daily 7 \
-          --keep-weekly 4 \
-          --keep-monthly 12 \
-          --prune \
-          --repo {{ backup_repo }}
+    backup_repo: "rest:http://192.168.72.131:8000/repo"  # Beispiel: REST-Server oder NFS-Mount
 
-    - name: Check Backup Integrity
+  tasks:
+    - name: Create .restic.env file with password
+      copy:
+        content: "export RESTIC_PASSWORD={{ restic_password }}"
+        dest: ~/.restic.env
+        mode: '0600'
+
+    - name: Source Restic environment variables
       shell: |
-        export RESTIC_PASSWORD="{{ restic_password }}"
-        restic check --repo {{ backup_repo }}
+        source ~/.restic.env
+        echo $RESTIC_PASSWORD
+      register: restic_env
+      changed_when: false
+
+    - name: Forget old snapshots
+      shell: |
+        source ~/.restic.env
+        restic -r {{ backup_repo }} forget --keep-last 7 --keep-daily 30 --keep-weekly 12
+      register: forget_result
+      failed_when: forget_result.rc != 0
+
+    - name: Prune repository
+      shell: |
+        source ~/.restic.env
+        restic -r {{ backup_repo }} prune
+      register: prune_result
+      failed_when: prune_result.rc != 0
+
+    - name: Debug cleanup results
+      debug:
+        msg: "Snapshots forgotten: {{ forget_result.stdout_lines }}\nPrune results: {{ prune_result.stdout_lines }}"
