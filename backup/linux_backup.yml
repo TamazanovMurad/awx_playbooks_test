@@ -4,20 +4,21 @@
   gather_facts: no
   vars:
     restic_password: "kali"
-    backup_repo: "/mnt/backup"  # Lokaler Mount-Punkt für den SMB-Share
+    backup_repo: "/mnt/backup/repo"  # Pfad zum Restic-Repository
     backup_paths:
-      - /home/kali
-      - /var/www
+      - /home
+      - /etc
+      - /var/log
 
   tasks:
-    - name: Ensure Restic is installed
+    - name: Ensure Restic is installed (Debian/Ubuntu)
       apt:
         name: restic
         state: present
       when: ansible_os_family == "Debian"
       become: yes
 
-    - name: Ensure Restic is installed (RedHat)
+    - name: Ensure Restic is installed (RHEL/CentOS)
       yum:
         name: restic
         state: present
@@ -39,7 +40,7 @@
       changed_when: false
       become: yes
 
-    - name: Initialize repository if not already initialized
+    - name: Initialize Restic repository if not already initialized
       shell: |
         source ~/.restic.env
         restic -r {{ backup_repo }} snapshots || restic -r {{ backup_repo }} init
