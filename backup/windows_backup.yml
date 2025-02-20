@@ -37,10 +37,17 @@
       - name: Check if backup repository is already mounted
         win_shell: net use | findstr "{{ backup_repo }}"
         register: repo_check
-        ignore_errors: yes
+        failed_when: false  # Ignorieren nicht-kritische Fehler
+        changed_when: false # Verhindern, dass der Task als "changed" markiert wird
+  
+      # Debug-Ausgabe des Repository-Checks
+      - name: Debug output of repo_check
+        debug:
+          msg: "Repository check result: {{ repo_check.rc }} - {{ repo_check.stdout }}"
+        when: repo_check is defined
   
       # Mounten des Backup-Repositorys, wenn nicht bereits vorhanden
-      - name: Mount the backup repository
+      - name: Mount the backup repository if not already mounted
         win_command: net use {{ backup_repo }} /user:backuper "{{ restic_password }}"
         register: mount_result
         when: repo_check.rc != 0
@@ -52,9 +59,9 @@
            'successful' in mount_result.stdout.lower()"
   
       # Debug-Ausgabe des Mount-Ergebnisses
-      - name: Debug mount result
+      - name: Debug output of mount_result
         debug:
-          msg: "{{ mount_result.stdout_lines }}"
+          msg: "Mount result: {{ mount_result.stdout }}"
         when: mount_result is defined
   
       # Initialisieren des Repositorys, falls noch nicht vorhanden
