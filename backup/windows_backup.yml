@@ -17,13 +17,11 @@
         iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
       args:
         creates: "C:\\ProgramData\\Chocolatey"
-      when: not ansible_check_mode
 
-    - name: Install Restic via Chocolatey
-      win_chocolatey:
-        name: restic
-        state: present
-        force: yes
+    - name: Install Restic
+      win_shell: choco install restic -y --force
+      args:
+        creates: "C:\\ProgramData\\chocolatey\\lib\\restic"
 
     - name: Map network drive
       win_shell: |
