@@ -1,9 +1,8 @@
 ---
 - name: Backup Linux Hosts
   hosts: linux
-  gather_facts: no
+  gather_facts: yes
   vars:
-    ansible_os_family: Debian  # Setzen Sie den Betriebssystem-Typ manuell
     restic_password: "kali"
     backup_repo: "/mnt/backup/repo"  # Pfad zum Restic-Repository
     backup_paths:
@@ -52,21 +51,33 @@
 
     - name: Initialize Restic repository if not already initialized
       shell: |
+        set -a
         source ~/.restic.env
+        set +a
         restic -r {{ backup_repo }} snapshots || restic -r {{ backup_repo }} init
+      args:
+        executable: /bin/bash  # Verwenden Sie explizit Bash
       become: yes
 
     - name: Run backups for specified paths
       shell: |
+        set -a
         source ~/.restic.env
+        set +a
         restic -r {{ backup_repo }} backup {{ item }} --verbose
+      args:
+        executable: /bin/bash  # Verwenden Sie explizit Bash
       loop: "{{ backup_paths }}"
       become: yes
 
     - name: Verify backups were created
       shell: |
+        set -a
         source ~/.restic.env
+        set +a
         restic -r {{ backup_repo }} snapshots
+      args:
+        executable: /bin/bash  # Verwenden Sie explizit Bash
       register: snapshot_list
       failed_when: snapshot_list.rc != 0
       become: yes
