@@ -1,107 +1,83 @@
 ---
-- name: Backup Linux Hosts
+- name: Backup Linux Hosts with Duplicity (Fully Automated)
   hosts: linux
   gather_facts: yes
   vars:
-    restic_password: "kali"  # Passwort für das Restic-Repository
-    backup_repo: "/mnt/backup/repo"  # Pfad zum Restic-Repository im SMB-Share
-    backup_paths:
-      - /home
-      - /etc
-      - /var/log
+    duplicity_passphrase: "kali"  # Passphrase für den GPG-Schlüssel
+    backup_repo: "file:///mnt/backup/linux_duplicity"  # Pfad zum Backup-Repository
+    gpg_key_id: "E30C2574019B9A3B0DEA41C70E86A73071244775"  # ID des GPG-Schlüssels (vom Backup-Server)
 
   tasks:
-    - name: Ensure Restic is installed (Debian/Ubuntu)
+    - name: Ensure required packages are installed
       apt:
-        name: restic
+        name: "{{ item }}"
         state: present
+      loop:
+        - duplicity
+        - python3-gi
+        - python3-boto3
+        - gnupg
       when: ansible_os_family == "Debian"
       become: yes
 
-    - name: Ensure Restic is installed (RHEL/CentOS)
+    - name: Ensure required packages are installed (RHEL/CentOS)
       yum:
-        name: restic
+        name: "{{ item }}"
         state: present
+      loop:
+        - duplicity
+        - python3-gobject
+        - python3-boto3
+        - gnupg
       when: ansible_os_family == "RedHat"
       become: yes
 
-    - name: Create .restic.env file with password
+    - name: Fetch GPG public key from backup server
+      fetch:
+        src: "/mnt/backup/linux_duplicity/linux_backup.pubkey"  # Pfad zur GPG-Pubkey-Datei auf dem Backup-Server
+        dest: "/tmp/"  # Lokaler Pfad auf dem Control Node
+        flat: yes
+      delegate_to: localhost
+      run_once: true
+      become: yes
+
+    - name: Transfer GPG public key to target host
       copy:
-        content: "export RESTIC_PASSWORD={{ restic_password }}"
-        dest: ~/.restic.env
+        src: "/tmp/linux_backup.pubkey"  # Lokaler Pfad auf dem Control Node
+        dest: "/home/{{ ansible_user }}/linux_backup.pubkey"
         mode: '0600'
       become: yes
 
-    - name: Source Restic environment variables
+    - name: Import GPG public key on target host
       shell: |
-        set -a
-        source ~/.restic.env
-        set +a
-        echo $RESTIC_PASSWORD
-      register: restic_env
-      changed_when: false
-      become: yes
-
-    - name: Check if backup repository is mounted correctly
-      shell: df -h | grep 192.168.72.131
-      register: mount_check
-      failed_when: "'192.168.72.131' not in mount_check.stdout"
-      changed_when: false
-
-    - name: Debug output of mount check
-      debug:
-        msg: "{{ mount_check.stdout }}"
-
-    - name: Ensure correct ownership and permissions for backup mount point
-      file:
-        path: /mnt/backup
-        owner: kali  # Stellen Sie sicher, dass der Benutzer "kali" Besitzer ist
-        group: kali  # Stellen Sie sicher, dass die Gruppe "kali" verwendet wird
-        mode: '0700'  # Setzen von strikten Berechtigungen
-      become: yes
-
-    - name: Ensure backup repository directory exists
-      file:
-        path: "{{ backup_repo }}"
-        state: directory
-        owner: kali  # Stellen Sie sicher, dass der Benutzer "kali" Besitzer ist
-        group: kali  # Stellen Sie sicher, dass die Gruppe "kali" verwendet wird
-        mode: '0700'  # Setzen von strikten Berechtigungen
-      become: yes
-
-    - name: Initialize Restic repository if not already initialized
-      shell: |
-        set -a
-        source ~/.restic.env
-        set +a
-        restic -r {{ backup_repo }} snapshots || restic -r {{ backup_repo }} init
+        gpg --import /home/{{ ansible_user }}/linux_backup.pubkey
+        gpg --edit-key {{ gpg_key_id }} <<EOF
+        trust
+        5
+        save
+        EOF
       args:
         executable: /bin/bash
       become: yes
 
     - name: Run backups for specified paths
       shell: |
-        set -a
-        source ~/.restic.env
-        set +a
-        restic -r {{ backup_repo }} backup {{ item }} --verbose
-      loop: "{{ backup_paths }}"
+        export PASSPHRASE={{ duplicity_passphrase }}
+        duplicity full "{{ item }}" {{ backup_repo }} --encrypt-key {{ gpg_key_id }}
+        unset PASSPHRASE
+      loop:
+        - /home
+        - /etc
+        - /var/log
       args:
         executable: /bin/bash
       become: yes
 
     - name: Verify backups were created
-      shell: |
-        set -a
-        source ~/.restic.env
-        set +a
-        restic -r {{ backup_repo }} snapshots
-      args:
-        executable: /bin/bash
-      register: snapshot_list
-      failed_when: snapshot_list.rc != 0
+      shell: duplicity collection-status {{ backup_repo }}
+      register: status_output
       become: yes
 
-    - name: Debug output of snapshots
+    - name: Debug output of backup status
       debug:
-        msg: "{{ snapshot_list.stdout_lines }}"
+        msg: "{{ status_output.stdout_lines }}"
