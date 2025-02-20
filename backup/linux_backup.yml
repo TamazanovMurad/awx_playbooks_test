@@ -6,6 +6,8 @@
     duplicity_passphrase: "kali"  # Passphrase für den GPG-Schlüssel
     backup_repo: "file:///mnt/backup/linux_duplicity"  # Pfad zum Backup-Repository
     gpg_pubkey_path: "/mnt/backup/linux_duplicity/linux_backup.pubkey"  # Pfad zur öffentlichen GPG-Pubkey-Datei
+    backup_server_user: "backuper"  # Benutzername auf dem Backup-Server
+    backup_server_ip: "192.168.72.131"  # IP-Adresse des Backup-Servers
 
   tasks:
     - name: Ensure required packages are installed (Debian/Ubuntu)
@@ -22,14 +24,13 @@
       when: ansible_os_family == "RedHat"
       become: yes
 
-    - name: Fetch GPG public key from backup server
-      fetch:
-        src: "{{ gpg_pubkey_path }}"  # Pfad zur GPG-Pubkey-Datei auf dem Backup-Server
-        dest: "/tmp/"  # Lokaler Pfad auf dem Control Node
-        flat: yes
+    - name: Fetch GPG public key from backup server via SCP
+      shell: |
+        scp {{ backup_server_user }}@{{ backup_server_ip }}:{{ gpg_pubkey_path }} /tmp/linux_backup.pubkey
       delegate_to: localhost
       run_once: true
-      become: yes
+      args:
+        executable: /bin/bash
 
     - name: Transfer GPG public key to target host
       copy:
