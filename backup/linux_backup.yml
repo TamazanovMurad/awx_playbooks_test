@@ -42,6 +42,16 @@
       changed_when: false
       become: yes
 
+    - name: Check if backup repository is mounted correctly
+      shell: df -h | grep 192.168.72.131
+      register: mount_check
+      failed_when: "'192.168.72.131' not in mount_check.stdout"
+      changed_when: false
+
+    - name: Debug output of mount check
+      debug:
+        msg: "{{ mount_check.stdout }}"
+
     - name: Ensure backup repository directory exists
       file:
         path: "{{ backup_repo }}"
@@ -66,7 +76,7 @@
         set -a
         source ~/.restic.env
         set +a
-        restic -r {{ backup_repo }} backup {{ item }} --verbose --option progress=true
+        restic -r {{ backup_repo }} backup {{ item }} --verbose
       loop: "{{ backup_paths }}"
       args:
         executable: /bin/bash
