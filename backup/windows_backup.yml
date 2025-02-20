@@ -10,18 +10,18 @@
         - C:\Programme
   
     tasks:
-      # Installieren von Chocolatey, falls noch nicht vorhanden
-      - name: Install Chocolatey if not already installed
-        win_chocolatey:
-          name: chocolatey
-          state: present
-          install_args: /ia "/norestart /quiet"
-  
-      # Installieren von Restic über Chocolatey
+      - name: Install Chocolatey
+        win_shell: |
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        args:
+          creates: "C:\\ProgramData\\Chocolatey"
+
       - name: Install Restic
-        win_chocolatey:
-          name: restic
-          state: present
+        win_shell: choco install restic -y --force
+        args:
+          creates: "C:\\ProgramData\\chocolatey\\lib\\restic"
   
       # Setzen der Umgebungsvariable für das Restic-Passwort
       - name: Set RESTIC_PASSWORD environment variable
