@@ -1,97 +1,67 @@
 ---
-- name: Backup Windows Hosts
-  hosts: windows
-  gather_facts: no
-  vars:
-    restic_password: "kali"
-    backup_repo: "\\\\192.168.72.131\\backup"
-    backup_paths:
-      - C:\Users\ansible
-      - C:\Programme
-
-  tasks:
-    - name: Install Chocolatey if not already installed
-      win_shell: |
-        if (-not (Test-Path "$env:ProgramData\Chocolatey")) {
-          Set-ExecutionPolicy Bypass -Scope Process -Force
-          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-          Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-        }
-      args:
-        creates: "C:\\ProgramData\\Chocolatey"
-
-    - name: Add Chocolatey to PATH
-      win_path:
-        elements:
-          - "C:\\ProgramData\\chocolatey\\bin"
-        state: present
-
-    - name: Install Restic
-      win_shell: choco install restic -y --force
-
-    - name: Ensure the repository is mounted and initialized
-      win_shell: |
-        $password = "{{ restic_password }}"
-        $repo = "{{ backup_repo }}"
-        net use $repo /user:backuper $password
-        if ($?) {
-          Write-Output "Repository mounted successfully."
-        } else {
-          throw "Failed to mount repository."
-        }
-
-        # Set RESTIC_PASSWORD environment variable
-        $env:RESTIC_PASSWORD = $password
-
-        # Check if repository is initialized
-        restic -r $repo snapshots
-        if ($LastExitCode -ne 0) {
-          restic -r $repo init
-        }
-      args:
-        executable: powershell
-
-    - name: Run backups with verbose output
-      win_shell: |
-        $password = "{{ restic_password }}"
-        $repo = "{{ backup_repo }}"
-        net use $repo /user:backuper $password
-        if ($?) {
-          Write-Output "Repository mounted successfully."
-        } else {
-          throw "Failed to mount repository."
-        }
-
-        # Set RESTIC_PASSWORD environment variable
-        $env:RESTIC_PASSWORD = $password
-
-        # Perform backup for each path
-        restic -r $repo backup {{ item }} --verbose
-        if ($LastExitCode -ne 0) {
-          throw "Backup failed for path: {{ item }}"
-        }
-      loop: "{{ backup_paths }}"
-      args:
-        executable: powershell
-
-    - name: Verify backups were created
-      win_shell: |
-        $password = "{{ restic_password }}"
-        $repo = "{{ backup_repo }}"
-        net use $repo /user:backuper $password
-        if ($?) {
-          Write-Output "Repository mounted successfully."
-        } else {
-          throw "Failed to mount repository."
-        }
-
-        # Set RESTIC_PASSWORD environment variable
-        $env:RESTIC_PASSWORD = $password
-
-        # List snapshots to verify backups
-        restic -r $repo snapshots
-        if ($LastExitCode -ne 0) {
-          throw "Failed to list snapshots."
-        }
-      args:
-        executable: powershell
+  - name: Backup Windows Hosts
+    hosts: windows
+    gather_facts: no
+    vars:
+      restic_password: "kali"
+      backup_repo: "\\\\192.168.72.131\\backup"
+      backup_paths:
+        - C:\Users\ansible
+        - C:\Programme
+  
+    tasks:
+      # Installieren von Chocolatey, falls noch nicht vorhanden
+      - name: Install Chocolatey if not already installed
+        win_chocolatey:
+          name: chocolatey
+          state: present
+          install_args: /ia "/norestart /quiet"
+  
+      # Installieren von Restic über Chocolatey
+      - name: Install Restic
+        win_chocolatey:
+          name: restic
+          state: present
+  
+      # Setzen der Umgebungsvariable für das Restic-Passwort
+      - name: Set RESTIC_PASSWORD environment variable
+        win_environment:
+          name: RESTIC_PASSWORD
+          value: "{{ restic_password }}"
+          state: present
+          scope: machine
+  
+      # Mounten des Backup-Repositorys
+      - name: Mount the backup repository
+        win_command: net use {{ backup_repo }} /user:backuper "{{ restic_password }}"
+        register: mount_result
+        failed_when: "'successful' not in mount_result.stdout.lower()"
+        changed_when: "'successful' in mount_result.stdout.lower()"
+  
+      # Initialisieren des Repositorys, falls noch nicht vorhanden
+      - name: Initialize Restic repository if not already initialized
+        win_command: restic -r "{{ backup_repo }}" snapshots
+        register: repo_init_check
+        ignore_errors: yes
+  
+      - name: Initialize Restic repository
+        win_command: restic -r "{{ backup_repo }}" init
+        when: repo_init_check.rc != 0
+  
+      # Durchführen der Backups
+      - name: Run backups for specified paths
+        win_command: restic -r "{{ backup_repo }}" backup "{{ item }}" --verbose
+        loop: "{{ backup_paths }}"
+        register: backup_results
+        failed_when: backup_results.rc != 0
+  
+      # Überprüfen der erstellten Snapshots
+      - name: Verify backups by listing snapshots
+        win_command: restic -r "{{ backup_repo }}" snapshots
+        register: snapshot_list
+        failed_when: snapshot_list.rc != 0
+  
+      # Debug-Ausgabe der Snapshots (optional)
+      - name: Debug output of snapshots
+        debug:
+          msg: "{{ snapshot_list.stdout_lines }}"
