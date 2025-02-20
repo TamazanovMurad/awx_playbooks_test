@@ -31,13 +31,26 @@
       args:
         executable: /bin/bash
 
+    - name: Debug SCP command
+      debug:
+        msg: "Running SCP command: scp {{ backup_server_user }}@{{ backup_server_ip }}:{{ gpg_pubkey_path }} /tmp/linux_backup.pubkey"
+      delegate_to: localhost
+      run_once: true
+
     - name: Fetch GPG public key from backup server via SCP
       shell: |
-        scp {{ backup_server_user }}@{{ backup_server_ip }}:{{ gpg_pubkey_path }} /tmp/linux_backup.pubkey
+        scp -o ConnectTimeout=30 {{ backup_server_user }}@{{ backup_server_ip }}:{{ gpg_pubkey_path }} /tmp/linux_backup.pubkey
       delegate_to: localhost
       run_once: true
       args:
         executable: /bin/bash
+      register: scp_result
+      failed_when: "'No such file or directory' in scp_result.stderr or 'Permission denied' in scp_result.stderr"
+
+    - name: Debug SCP result
+      debug:
+        msg: "{{ scp_result.stdout }} | Error: {{ scp_result.stderr }}"
+      when: scp_result is defined
 
     - name: Transfer GPG public key to target host
       copy:
