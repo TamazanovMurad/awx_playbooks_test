@@ -31,28 +31,42 @@
 
     - name: Ensure the repository is mounted and initialized
       win_shell: |
-        net use {{ backup_repo }} /user:backuper kali
+        $password = "{{ restic_password }}"
+        $repo = "{{ backup_repo }}"
+        net use $repo /user:backuper $password
         if ($?) {
           Write-Output "Repository mounted successfully."
         } else {
           throw "Failed to mount repository."
         }
-        restic -r "{{ backup_repo }}" snapshots --password "{{ restic_password }}"
+
+        # Set RESTIC_PASSWORD environment variable
+        $env:RESTIC_PASSWORD = $password
+
+        # Check if repository is initialized
+        restic -r $repo snapshots
         if ($LastExitCode -ne 0) {
-          restic -r "{{ backup_repo }}" init --password "{{ restic_password }}"
+          restic -r $repo init
         }
       args:
         executable: powershell
 
     - name: Run backups with verbose output
       win_shell: |
-        net use {{ backup_repo }} /user:backuper kali
+        $password = "{{ restic_password }}"
+        $repo = "{{ backup_repo }}"
+        net use $repo /user:backuper $password
         if ($?) {
           Write-Output "Repository mounted successfully."
         } else {
           throw "Failed to mount repository."
         }
-        restic backup {{ item }} --repo "{{ backup_repo }}" --password "{{ restic_password }}" --verbose
+
+        # Set RESTIC_PASSWORD environment variable
+        $env:RESTIC_PASSWORD = $password
+
+        # Perform backup for each path
+        restic -r $repo backup {{ item }} --verbose
         if ($LastExitCode -ne 0) {
           throw "Backup failed for path: {{ item }}"
         }
@@ -62,13 +76,20 @@
 
     - name: Verify backups were created
       win_shell: |
-        net use {{ backup_repo }} /user:backuper kali
+        $password = "{{ restic_password }}"
+        $repo = "{{ backup_repo }}"
+        net use $repo /user:backuper $password
         if ($?) {
           Write-Output "Repository mounted successfully."
         } else {
           throw "Failed to mount repository."
         }
-        restic -r "{{ backup_repo }}" snapshots --password "{{ restic_password }}"
+
+        # Set RESTIC_PASSWORD environment variable
+        $env:RESTIC_PASSWORD = $password
+
+        # List snapshots to verify backups
+        restic -r $repo snapshots
         if ($LastExitCode -ne 0) {
           throw "Failed to list snapshots."
         }
