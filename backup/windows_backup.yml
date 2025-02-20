@@ -10,6 +10,7 @@
         - C:\Programme
   
     tasks:
+      # Installieren von Chocolatey, falls noch nicht vorhanden
       - name: Install Chocolatey
         win_shell: |
           Set-ExecutionPolicy Bypass -Scope Process -Force
@@ -17,7 +18,8 @@
           iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
         args:
           creates: "C:\\ProgramData\\Chocolatey"
-
+  
+      # Installieren von Restic über Chocolatey
       - name: Install Restic
         win_shell: choco install restic -y --force
         args:
@@ -29,7 +31,7 @@
           name: RESTIC_PASSWORD
           value: "{{ restic_password }}"
           state: present
-          scope: machine
+          level: machine
   
       # Mounten des Backup-Repositorys
       - name: Mount the backup repository
@@ -37,6 +39,12 @@
         register: mount_result
         failed_when: "'successful' not in mount_result.stdout.lower()"
         changed_when: "'successful' in mount_result.stdout.lower()"
+  
+      # Debug-Ausgabe des Mount-Ergebnisses
+      - name: Debug mount result
+        debug:
+          msg: "{{ mount_result.stdout_lines }}"
+        when: mount_result is defined
   
       # Initialisieren des Repositorys, falls noch nicht vorhanden
       - name: Initialize Restic repository if not already initialized
@@ -61,7 +69,7 @@
         register: snapshot_list
         failed_when: snapshot_list.rc != 0
   
-      # Debug-Ausgabe der Snapshots (optional)
+      # Debug-Ausgabe der Snapshots
       - name: Debug output of snapshots
         debug:
           msg: "{{ snapshot_list.stdout_lines }}"
