@@ -5,10 +5,10 @@
   vars:
     duplicity_passphrase: "kali"  # Passphrase für den GPG-Schlüssel
     backup_repo: "file:///mnt/backup/linux_duplicity"  # Pfad zum Backup-Repository
-    gpg_key_id: "E30C2574019B9A3B0DEA41C70E86A73071244775"  # ID des GPG-Schlüssels (vom Backup-Server)
+    gpg_pubkey_path: "/mnt/backup/linux_duplicity/linux_backup.pubkey"  # Pfad zur öffentlichen GPG-Pubkey-Datei
 
   tasks:
-    - name: Ensure required packages are installed
+    - name: Ensure required packages are installed (Debian/Ubuntu)
       apt:
         name: "{{ item }}"
         state: present
@@ -17,6 +17,7 @@
         - python3-gi
         - python3-boto3
         - gnupg
+        - python3-apt  # Hinzugefügt, um das Problem zu beheben
       when: ansible_os_family == "Debian"
       become: yes
 
@@ -34,7 +35,7 @@
 
     - name: Fetch GPG public key from backup server
       fetch:
-        src: "/mnt/backup/linux_duplicity/linux_backup.pubkey"  # Pfad zur GPG-Pubkey-Datei auf dem Backup-Server
+        src: "{{ gpg_pubkey_path }}"  # Pfad zur GPG-Pubkey-Datei auf dem Backup-Server
         dest: "/tmp/"  # Lokaler Pfad auf dem Control Node
         flat: yes
       delegate_to: localhost
@@ -51,13 +52,15 @@
     - name: Import GPG public key on target host
       shell: |
         gpg --import /home/{{ ansible_user }}/linux_backup.pubkey
-        gpg --edit-key {{ gpg_key_id }} <<EOF
-        trust
-        5
-        save
-        EOF
+        gpg --list-keys | grep '^pub' | awk '{print $2}' | cut -d'/' -f2
+      register: gpg_key_id
       args:
         executable: /bin/bash
+      become: yes
+
+    - name: Set GPG key ID as fact
+      set_fact:
+        gpg_key_id: "{{ gpg_key_id.stdout }}"
       become: yes
 
     - name: Run backups for specified paths
