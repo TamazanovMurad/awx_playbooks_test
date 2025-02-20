@@ -33,12 +33,23 @@
           state: present
           level: machine
   
-      # Mounten des Backup-Repositorys
+      # Prüfen, ob das Repository bereits gemounted ist
+      - name: Check if backup repository is already mounted
+        win_shell: net use | findstr "{{ backup_repo }}"
+        register: repo_check
+        ignore_errors: yes
+  
+      # Mounten des Backup-Repositorys, wenn nicht bereits vorhanden
       - name: Mount the backup repository
         win_command: net use {{ backup_repo }} /user:backuper "{{ restic_password }}"
         register: mount_result
-        failed_when: "'successful' not in mount_result.stdout.lower()"
-        changed_when: "'successful' in mount_result.stdout.lower()"
+        when: repo_check.rc != 0
+        failed_when: >
+          "'erfolgreich' not in mount_result.stdout.lower() and
+           'successful' not in mount_result.stdout.lower()"
+        changed_when: >
+          "'erfolgreich' in mount_result.stdout.lower() or
+           'successful' in mount_result.stdout.lower()"
   
       # Debug-Ausgabe des Mount-Ergebnisses
       - name: Debug mount result
