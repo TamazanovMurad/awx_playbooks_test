@@ -11,15 +11,11 @@
       linux_user: "kali"
   
     tasks:
-      - name: Installiere Python3 und notwendige Abhängigkeiten
+      - name: Installiere notwendige Pakete
         raw: |
           apt-get update
-          apt-get install -y python3 python3-apt
+          apt-get install -y python3 python3-apt sshpass borgbackup
           ln -sf /usr/bin/python3 /usr/bin/python
-  
-      - name: BorgBackup manuell installieren (ohne apt-Modul)
-        raw: |
-          apt-get install -y borgbackup
   
       - name: Generiere SSH-Schlüssel
         user:
