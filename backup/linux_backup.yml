@@ -2,7 +2,7 @@
 - name: Linux Server Backup mit Borg
   hosts: linux
   vars:
-    borg_repo: "backuper@192.168.72.131://mnt/backup/linux"
+    borg_repo: "backuper@192.168.72.131:/mnt/backup/linux/{{ ansible_hostname }}"
     encryption_passphrase: "kali"
     backup_dirs:
       - /etc
@@ -14,6 +14,7 @@
       - "/home/*/downloads"
 
   tasks:
+    # Stellen Sie sicher, dass python3-apt installiert ist
     - name: Ensure python3-apt is installed
       raw: |
         if ! dpkg -s python3-apt >/dev/null 2>&1; then
@@ -21,30 +22,37 @@
         fi
       changed_when: false
 
-    - name: Install necessary dependencies for BorgBackup
-      command: apt update && apt install -y python3-pip python3-dev libssl-dev libacl1-dev build-essential pkg-config
+    # Installieren Sie notwendige Abhängigkeiten für BorgBackup
+    - name: Update package lists and install necessary dependencies for BorgBackup
+      shell: apt update && apt install -y python3-pip python3-dev libssl-dev libacl1-dev build-essential pkg-config
 
+    # Installieren Sie BorgBackup mit pip
     - name: Install BorgBackup using pip
       command: pip3 install borgbackup
 
-    - name: Backup-Repository initialisieren
+    # Initialisieren Sie das Backup-Repository (nur einmal nötig)
+    - name: Initialize the backup repository if it does not exist
       become: false
       command: "borg init --encryption=repokey {{ borg_repo }}"
       args:
-        creates: "/mnt/backup/linux/config"
+        creates: "{{ borg_repo }}/config"  # Überprüft, ob das Repository bereits initialisiert wurde
       environment:
         BORG_PASSPHRASE: "{{ encryption_passphrase }}"
 
-    - name: Backup erstellen mit Ausschlussliste
+    # Erstellen Sie ein Backup mit Ausschlussmuster
+    - name: Create a new backup with exclusion patterns
       command: >
         borg create --stats --progress --compression zstd
-        --exclude '{{ item }}' {{ borg_repo }}::"{hostname}-{now}" {{ backup_dirs | join(' ') }}
+        --exclude '{{ item }}'
+        {{ borg_repo }}::{{ ansible_hostname }}-{% now('local', '%Y-%m-%d_%H:%M:%S') %} 
+        {{ backup_dirs | join(' ') }}
       loop: "{{ exclude_patterns }}"
       environment:
         BORG_PASSPHRASE: "{{ encryption_passphrase }}"
         BORG_RSH: "ssh -i /path/to/linux_backup_key"
 
-    - name: Alte Backups bereinigen
+    # Bereinigen Sie alte Backups
+    - name: Prune old backups
       command: >
         borg prune --keep-daily 7 --keep-weekly 4 --keep-monthly 6 {{ borg_repo }}
       environment:
