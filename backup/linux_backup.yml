@@ -1,129 +1,55 @@
 ---
-- name: Backup Linux Hosts with Duplicity (Fully Automated)
-  hosts: linux
-  gather_facts: yes
+- name: Perform Incremental Backups with BorgBackup
+  hosts: linux_hosts
+  become: yes
   vars:
-    duplicity_passphrase: "kali"  # Passphrase für den GPG-Schlüssel
-    backup_repo: "file:///mnt/backup/linux_duplicity"  # Pfad zum Backup-Repository
-    gpg_pubkey_path: "/mnt/backup/linux_duplicity/linux_backup.pubkey"  # Pfad zur öffentlichen GPG-Pubkey-Datei
-    backup_server_ip: "192.168.72.131"  # IP-Adresse des Backup-Servers
+    backup_server_ip: "192.168.72.131"
+    backup_repo_path: "ssh://backuper@{{ backup_server_ip }}/mnt/backup/linux/{{ ansible_hostname }}"
+    borg_passphrase: "your_secure_password"  # Ändern Sie dies in ein sicheres Passwort!
+    exclude_files:
+      - /dev/
+      - /proc/
+      - /sys/
+      - /tmp/
+      - /run/
+      - /mnt/
+      - /media/
+      - /lost+found
 
   tasks:
-    - name: Ensure required packages are installed (Debian/Ubuntu)
-      shell: |
-        apt update
-        apt install -y duplicity python3-gi python3-boto3 gnupg python3-apt
-      when: ansible_os_family == "Debian"
+    - name: Ensure BorgBackup is installed on client
+      apt:
+        name: borgbackup
+        state: present
+      tags: install
+
+    - name: Create SSH key if it does not exist
+      user:
+        name: "{{ ansible_user }}"
+        generate_ssh_key: yes
+        ssh_key_bits: 2048
+        ssh_key_file: .ssh/id_rsa
+      when: not lookup('file', '~/.ssh/id_rsa.pub', errors='ignore')
+      tags: setup
+
+    - name: Copy public SSH key to backup server
+      authorized_key:
+        user: backuper
+        state: present
+        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+      delegate_to: "{{ backup_server_ip }}"
       become: yes
+      become_user: backuper
+      tags: setup
 
-    - name: Ensure required packages are installed (RHEL/CentOS)
-      shell: |
-        yum install -y epel-release
-        yum install -y duplicity python3-gobject python3-boto3 gnupg
-      when: ansible_os_family == "RedHat"
-      become: yes
-
-    - name: Add backup server to known_hosts
-      shell: ssh-keyscan -t ed25519 {{ backup_server_ip }} >> ~/.ssh/known_hosts
-      delegate_to: localhost
-      run_once: true
-      args:
-        executable: /bin/bash
-
-    - name: Fetch GPG public key from backup server via HTTP
-      get_url:
-        url: "http://{{ backup_server_ip }}/linux_backup.pubkey"
-        dest: "/tmp/linux_backup.pubkey"
-        mode: '0600'
-      delegate_to: localhost
-      run_once: true
-
-    - name: Transfer GPG public key to target host
-      copy:
-        src: "/tmp/linux_backup.pubkey"  # Lokaler Pfad auf dem Control Node
-        dest: "/home/{{ ansible_user }}/linux_backup.pubkey"
-        mode: '0600'
-      become: yes
-
-    - name: Initialize shared GPG home directory
-      file:
-        path: /etc/gnupg
-        state: directory
-        mode: '0700'
-        owner: root
-        group: root
-      become: yes
-
-    - name: Create empty pubring.kbx if it does not exist
-      file:
-        path: /etc/gnupg/pubring.kbx
-        state: touch
-        mode: '0600'
-        owner: root
-        group: root
-      become: yes
-
-    - name: Import GPG public key on target host (systemwide)
-      shell: |
-        sudo GNUPGHOME=/etc/gnupg gpg --import /home/{{ ansible_user }}/linux_backup.pubkey
-        sudo GNUPGHOME=/etc/gnupg gpg --list-keys | awk '/^pub/{print $2}' | cut -d'/' -f2
-      register: gpg_key_id_raw
-      args:
-        executable: /bin/bash
-      become: yes
-
-    - name: Set GPG key ID as fact (using full fingerprint)
-      set_fact:
-        gpg_key_id: "{{ gpg_key_id_raw.stdout.strip() }}"
-      become: yes
-
-    - name: Debug extracted GPG key ID
-      debug:
-        msg: "Extracted GPG Key ID: {{ gpg_key_id }}"
-      when: gpg_key_id is defined
-
-    - name: Set owner trust for the imported GPG key (systemwide)
-      shell: |
-        echo "{{ gpg_key_id }}:6:" | sudo GNUPGHOME=/etc/gnupg gpg --import-ownertrust
-      args:
-        executable: /bin/bash
-      become: yes
-
-    - name: Debug systemwide GPG trust list
-      shell: sudo GNUPGHOME=/etc/gnupg gpg --list-keys --with-colons
-      register: gpg_trust_list
-      become: yes
-
-    - name: Show systemwide GPG trust list
-      debug:
-        msg: "{{ gpg_trust_list.stdout_lines }}"
-      when: gpg_trust_list is defined
-
-    - name: Run backups for specified paths
-      shell: |
-        export PASSPHRASE={{ duplicity_passphrase }}
-        export GNUPGHOME=/etc/gnupg
-        duplicity full --verbose "{{ item }}" {{ backup_repo }} --encrypt-key {{ gpg_key_id }}
-        unset PASSPHRASE
-      loop:
-        - /home
-        - /etc
-        - /var/log
-      args:
-        executable: /bin/bash
-      become: yes
-      register: backup_results
-
-    - name: Debug backup results
-      debug:
-        msg: "{{ backup_results.results | map(attribute='stdout_lines') | list }}"
-      when: backup_results is defined
-
-    - name: Verify backups were created
-      shell: duplicity collection-status {{ backup_repo }}
-      register: status_output
-      become: yes
-
-    - name: Debug output of backup status
-      debug:
-        msg: "{{ status_output.stdout_lines }}"
+    - name: Perform incremental backup
+      command: >
+        borg create
+        --compression lz4
+        --exclude {{ item }}
+        {{ backup_repo_path }}::{{ ansible_date_time.date }}-{{ ansible_date_time.hour }}-{{ ansible_date_time.minute }}
+        /
+      loop: "{{ exclude_files }}"
+      environment:
+        BORG_PASSPHRASE: "{{ borg_passphrase }}"
+      tags: backup
