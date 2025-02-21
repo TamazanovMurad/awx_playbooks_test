@@ -1,64 +1,43 @@
 ---
-- name: Fully Automated Backup Setup for Linux Clients with BorgBackup
+- name: Linux Server Backup mit Borg
   hosts: linux
-  become: yes
   vars:
-    backup_server_ip: "192.168.72.131"  # IP des Backup-Servers
-    backup_user: "backuper"             # Benutzername auf dem Backup-Server
-    backup_repo_path: "ssh://{{ backup_user }}@{{ backup_server_ip }}/mnt/backup/linux/{{ ansible_hostname }}"
-    borg_passphrase: "kali"  # Ändern Sie dies in ein sicheres Passwort!
-    exclude_files:
-      - /dev/
-      - /proc/
-      - /sys/
-      - /tmp/
-      - /run/
-      - /mnt/
-      - /media/
-      - /lost+found
+    borg_repo: "backuper@192.168.72.131://mnt/backup/linux"
+    encryption_passphrase: "kali"
+    backup_dirs:
+      - /etc
+      - /home
+      - /var/www
+    exclude_patterns:
+      - "*.tmp"
+      - "*.cache"
+      - "/home/*/downloads"
 
   tasks:
-
-    # --- GRUPPE 1: SICHERSTELLEN, DASS ANSIBLE MODULE FUNKTIONIEREN ---
-    - name: Ensure python3-apt is installed
-      raw: |
-        if ! dpkg -s python3-apt >/dev/null 2>&1; then
-          apt update && apt install -y python3-apt
-        fi
-      changed_when: false
-
-    # --- GRUPPE 2: INSTALLATION VON BORGBACKUP ---
-    - name: Install BorgBackup on the client
+    - name: BorgBackup installieren
       apt:
         name: borgbackup
         state: present
 
-    # --- GRUPPE 3: EINRICHTUNG PASSWORDFREIEN SSH-ZUGRIFFS ---
-    - name: Generate SSH key pair if it does not exist
-      user:
-        name: "{{ ansible_user }}"
-        generate_ssh_key: yes
-        ssh_key_bits: 2048
-        ssh_key_file: .ssh/id_rsa
-      when: not lookup('file', '~/.ssh/id_rsa.pub', errors='ignore')
-
-    - name: Copy public SSH key to backup server
-      authorized_key:
-        user: "{{ backup_user }}"
-        state: present
-        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
-      delegate_to: "{{ backup_server_ip }}"
-      become: yes
-      become_user: "{{ backup_user }}"
-
-    # --- GRUPPE 4: BACKUP-AUSFÜHRUNG ---
-    - name: Perform incremental backup
-      command: >
-        borg create
-        --compression lz4
-        --exclude {{ item }}
-        {{ backup_repo_path }}::{{ ansible_date_time.date }}-{{ ansible_date_time.hour }}-{{ ansible_date_time.minute }}
-        /
-      loop: "{{ exclude_files }}"
+    - name: Backup-Repository initialisieren
+      become: false
+      command: "borg init --encryption=repokey {{ borg_repo }}"
+      args:
+        creates: "/mnt/backup/linux/config"
       environment:
-        BORG_PASSPHRASE: "{{ borg_passphrase }}"
+        BORG_PASSPHRASE: "{{ encryption_passphrase }}"
+
+    - name: Backup erstellen mit Ausschlussliste
+      command: >
+        borg create --stats --progress --compression zstd
+        --exclude '{{ item }}' {{ borg_repo }}::"{hostname}-{now}" {{ backup_dirs | join(' ') }}
+      loop: "{{ exclude_patterns }}"
+      environment:
+        BORG_PASSPHRASE: "{{ encryption_passphrase }}"
+        BORG_RSH: "ssh -i /path/to/linux_backup_key"
+
+    - name: Alte Backups bereinigen
+      command: >
+        borg prune --keep-daily 7 --keep-weekly 4 --keep-monthly 6 {{ borg_repo }}
+      environment:
+        BORG_PASSPHRASE: "{{ encryption_passphrase }}"
