@@ -14,17 +14,20 @@
       - "/home/*/downloads"
 
   tasks:
-    - name: Python3-apt dependency installieren (raw)
+    - name: Install Python3-apt (Raw Command)
       become: true
       raw: |
-        if ! dpkg -l | grep -q python3-apt; then
-          apt-get update
-          apt-get install -y python3-apt
-        fi
-      changed_when: false
+        apt-get update -qq && 
+        apt-get install -y python3-apt &&
+        ln -sf /usr/bin/python3 /usr/bin/python
       args:
         executable: /bin/bash
+      changed_when: false
 
+    - name: Update fact gathering
+      setup:  # Erzwinge neues Fact Gathering nach Installation
+
+  tasks:
     - name: Paket-Cache aktualisieren
       become: true
       apt:
@@ -36,7 +39,7 @@
       apt:
         name: borgbackup
         state: present
-        force_apt_get: yes
+        
     - name: Backup-Repository initialisieren
       become: false
       command: "borg init --encryption=repokey {{ borg_repo }}"
