@@ -15,6 +15,7 @@
 
   tasks:
     # Stellen Sie sicher, dass python3-apt installiert ist
+    
     - name: Ensure python3-apt is installed
       raw: |
         if ! dpkg -s python3-apt >/dev/null 2>&1; then
@@ -23,12 +24,15 @@
       changed_when: false
 
     # Installieren Sie notwendige Abhängigkeiten für BorgBackup
-    - name: Update package lists and install necessary dependencies for BorgBackup
-      shell: apt update && apt install -y python3-pip python3-dev libssl-dev libacl1-dev build-essential pkg-config
+    - name: Install necessary dependencies for BorgBackup
+      shell: apt update && apt install -y libssl-dev libacl1-dev build-essential pkg-config
 
-    # Installieren Sie BorgBackup mit pip
-    - name: Install BorgBackup using pip
-      command: pip3 install borgbackup
+    # Fügen Sie das BorgBackup-Repository hinzu
+    - name: Add BorgBackup repository
+      copy:
+        dest: /etc/apt/sources.list.d/borgbackup.list
+        content: "deb http://deb.borgbackup.org/release focal main"
+      when: ansible_distribution == "Ubuntu" and ansible_distribution_release == "focal"
 
     # Initialisieren Sie das Backup-Repository (nur einmal nötig)
     - name: Initialize the backup repository if it does not exist
