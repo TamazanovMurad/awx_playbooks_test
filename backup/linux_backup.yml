@@ -48,7 +48,7 @@
     - name: Import GPG public key on target host
       shell: |
         gpg --import /home/{{ ansible_user }}/linux_backup.pubkey
-        gpg --list-keys | grep '^pub' | awk '{print $2}' | cut -d'/' -f2 | cut -c1-8
+        gpg --list-keys | awk '/^pub/{getline; print $1}' | cut -c1-8
       register: gpg_key_id_raw
       args:
         executable: /bin/bash
@@ -56,8 +56,13 @@
 
     - name: Set GPG key ID as fact (using short ID)
       set_fact:
-        gpg_key_id: "{{ gpg_key_id_raw.stdout }}"
+        gpg_key_id: "{{ gpg_key_id_raw.stdout.strip() }}"
       become: yes
+
+    - name: Debug extracted GPG key ID
+      debug:
+        msg: "Extracted GPG Key ID: {{ gpg_key_id }}"
+      when: gpg_key_id is defined
 
     - name: Trust the imported GPG key
       shell: |
