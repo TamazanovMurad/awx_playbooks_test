@@ -1,102 +1,96 @@
 ---
-  - name: Linux Server Backup mit Borg
+  # backup-setup.yml
+  - name: Configure Backup Server
     hosts: linux
     become: yes
     vars:
-      borg_repo: "backuper@192.168.72.131:/mnt/backup/linux/{{ ansible_hostname }}"
-      encryption_passphrase: "kali"
-      backup_dirs:
-        - /etc
-        - /home
-        - /var/www
-      exclude_patterns:
-        - "*.tmp"
-        - "*.cache"
-        - "/home/*/downloads"
+      backup_dir: /mnt/backup/linux
   
     tasks:
+      - name: Create backup user
+        user:
+          name: backuper
+          password: "{{ 'kali' | password_hash('sha512') }}"
+          shell: /bin/bash
   
-      # Stellen Sie sicher, dass python3-apt installiert ist
-      - name: Ensure python3-apt is installed
-        raw: |
-          if ! dpkg -s python3-apt >/dev/null 2>&1; then
-            apt update && apt install -y python3-apt
-          fi
-        changed_when: false
+      - name: Create backup directory
+        file:
+          path: "{{ backup_dir }}"
+          state: directory
+          owner: backuper
+          group: backuper
+          mode: '0755'
   
-      # Installieren Sie notwendige Abhängigkeiten für BorgBackup
-      - name: Install necessary dependencies for BorgBackup
-        shell: apt update && apt install -y libssl-dev libacl1-dev build-essential pkg-config
+      - name: Allow SSH password login (temporär)
+        lineinfile:
+          path: /etc/ssh/sshd_config
+          regexp: "^PasswordAuthentication"
+          line: "PasswordAuthentication yes"
+          state: present
+        notify: restart sshd
   
-      # Fügen Sie das BorgBackup-Repository manuell hinzu
-      - name: Add BorgBackup repository manually
-        copy:
-          dest: /etc/apt/sources.list.d/borgbackup.list
-          content: "deb [signed-by=/usr/share/keyrings/borgbackup-archive-keyring.gpg] http://deb.borgbackup.org/release {{ ansible_distribution_release }} main"
-        when: ansible_distribution == "Ubuntu" or ansible_distribution == "Debian"
+    handlers:
+      - name: restart sshd
+        service:
+          name: sshd
+          state: restarted
   
-            # Correct the GPG key import task
-      - name: Import BorgBackup GPG key using curl and gpg
-        shell: curl -fsSL https://borgbackup.org/archive-key.asc | gpg --dearmor -o /usr/share/keyrings/borgbackup-archive-keyring.gpg
-
-      # Correct the repository entry
-      - name: Add BorgBackup repository manually
-        copy:
-          dest: /etc/apt/sources.list.d/borgbackup.list
-          content: "deb [signed-by=/usr/share/keyrings/borgbackup-archive-keyring.gpg] https://deb.borgbackup.org/ {{ ansible_distribution_release }} main"
-        when: ansible_distribution == "Ubuntu" or ansible_distribution == "Debian"
+  - name: Configure Clients
+    hosts: linux_hosts
+    become: yes
+    vars:
+      backup_server_ip: "192.168.72.131"  # Hier anpassen!
+      backup_user: backuper
   
-      # Aktualisieren Sie die Paketlisten und installieren Sie BorgBackup
-      - name: Install BorgBackup using apt
+    tasks:
+      - name: Install BorgBackup
         apt:
           name: borgbackup
           state: present
           update_cache: yes
   
-      # Generieren Sie einen SSH-Schlüssel, falls noch keiner vorhanden ist
-      - name: Generate SSH key pair if it does not exist
+      - name: Create SSH keypair
         user:
-          name: "{{ ansible_user }}"
+          name: kali
           generate_ssh_key: yes
-          ssh_key_bits: 4096
-          ssh_key_file: .ssh/id_rsa
-        when: not lookup('file', '~/.ssh/id_rsa.pub', errors='ignore')
+          ssh_key_bits: 2048
+          ssh_key_file: .ssh/id_borg
   
-      # Kopieren Sie den öffentlichen SSH-Schlüssel auf den Backup-Server
-      - name: Copy public SSH key to backup server
+      - name: Copy public key to backup server
         authorized_key:
           user: backuper
           state: present
-          key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
-        delegate_to: "{{ '192.168.72.131' }}"
-        become: yes
-        become_user: backuper
+          key: "{{ lookup('file', '/home/kali/.ssh/id_borg.pub') }}"
+          manage_dir: yes
+        delegate_to: "{{ backup_server_ip }}"
   
-      # Initialisieren Sie das Backup-Repository (nur einmal nötig)
-      - name: Initialize the backup repository if it does not exist
-        command: "borg init --encryption=repokey {{ borg_repo }}"
+      - name: Initialize Borg repository
+        command: |
+          borg init --encryption=repokey \
+          backuper@{{ backup_server_ip }}:{{ backup_user }}/{{ ansible_hostname }} \
+          -e kali
         args:
-          creates: "{{ borg_repo }}/config"  # Überprüft, ob das Repository bereits initialisiert wurde
-        environment:
-          BORG_PASSPHRASE: "{{ encryption_passphrase }}"
-        delegate_to: localhost  # Delegieren Sie diesen Task an den lokalen Client
-        run_once: true  # Führen Sie diesen Task nur einmal aus
+          creates: "/home/backuper/{{ ansible_hostname }}/config"
+        changed_when: false
   
-      # Erstellen Sie ein Backup mit Ausschlussmuster
-      - name: Create a new backup with exclusion patterns
-        command: >
-          borg create --stats --progress --compression zstd
-          --exclude '{{ item }}'
-          {{ borg_repo }}::{{ ansible_hostname }}-{% now('local', '%Y-%m-%d_%H:%M:%S') %} 
-          {{ backup_dirs | join(' ') }}
-        loop: "{{ exclude_patterns }}"
-        environment:
-          BORG_PASSPHRASE: "{{ encryption_passphrase }}"
-          BORG_RSH: "ssh -i /path/to/linux_backup_key"
+      - name: Create backup script
+        copy:
+          dest: /home/kali/backup.sh
+          mode: 0755
+          content: |
+            #!/bin/bash
+            export BORG_PASSPHRASE='kali'
+            borg create --stats backuper@{{ backup_server_ip }}:backuper/$(hostname)::$(date +%Y-%m-%d_%H-%M) \
+              /etc /home /var/www \
+              --exclude '*.tmp' \
+              --exclude '*.cache'
+            
+            borg prune --keep-daily 7 backuper@{{ backup_server_ip }}:backuper/$(hostname)
   
-      # Bereinigen Sie alte Backups
-      - name: Prune old backups
-        command: >
-          borg prune --keep-daily 7 --keep-weekly 4 --keep-monthly 6 {{ borg_repo }}
-        environment:
-          BORG_PASSPHRASE: "{{ encryption_passphrase }}"
+      - name: Add cron job
+        cron:
+          name: "Daily Backup"
+          job: "/home/kali/backup.sh"
+          minute: "0"
+          hour: "2"
+          user: kali
