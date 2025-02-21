@@ -1,6 +1,6 @@
 ---
 - name: Fully Automated Backup Setup for Linux Clients with BorgBackup
-  hosts: linux
+  hosts: linux_clients
   become: yes
   vars:
     backup_server_ip: "192.168.72.131"  # IP des Backup-Servers
@@ -19,13 +19,18 @@
 
   tasks:
 
-    # --- GRUPPE 1: INSTALLATION VON BORGBACKUP ---
+    # --- GRUPPE 1: SICHERSTELLEN, DASS ANSIBLE MODULE FUNKTIONIEREN ---
+    - name: Ensure python3-apt is installed
+      raw: apt update && apt install -y python3-apt
+      when: ansible_distribution == "Ubuntu"
+
+    # --- GRUPPE 2: INSTALLATION VON BORGBACKUP ---
     - name: Install BorgBackup on the client
       apt:
         name: borgbackup
         state: present
 
-    # --- GRUPPE 2: EINRICHTUNG PASSWORDFREIEN SSH-ZUGRIFFS ---
+    # --- GRUPPE 3: EINRICHTUNG PASSWORDFREIEN SSH-ZUGRIFFS ---
     - name: Generate SSH key pair if it does not exist
       user:
         name: "{{ ansible_user }}"
@@ -43,7 +48,7 @@
       become: yes
       become_user: "{{ backup_user }}"
 
-    # --- GRUPPE 3: BACKUP-AUSFÜHRUNG ---
+    # --- GRUPPE 4: BACKUP-AUSFÜHRUNG ---
     - name: Perform incremental backup
       command: >
         borg create
