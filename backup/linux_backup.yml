@@ -1,7 +1,7 @@
 ---
-  # borg-client-setup.yml
-  - name: BorgBackup Client Konfiguration
-    hosts: linux  # Korrekter Host-Gruppenname
+  # borg-client-fix.yml
+  - name: BorgBackup Client Setup
+    hosts: linux
     become: yes
     vars:
       backup_server: 192.168.72.131
@@ -11,70 +11,69 @@
       linux_user: "kali"
   
     tasks:
-      - name: Python3-Apt Vorinstallation
+      - name: Installiere zwingend Python3-Apt
         raw: |
-          apt-get update && 
+          apt-get update
           apt-get install -y python3-apt
-        changed_when: true  # Wichtig für die Erkennung
+          test -f /usr/bin/python3 || ln -s /usr/bin/python3.* /usr/bin/python3
+        args:
+          executable: /bin/bash
+        changed_when: true
   
-      - name: BorgBackup installieren
+      - name: Setze Python Interpreter
+        set_fact:
+          ansible_python_interpreter: /usr/bin/python3
+  
+      - name: Installiere BorgBackup
         apt:
           name: borgbackup
           state: present
           update_cache: yes
-        register: apt_result
-        until: apt_result is succeeded
-        retries: 3
-        delay: 10
   
-      - name: SSH-Schlüsselpaar generieren
+      - name: Generiere SSH-Schlüssel
         user:
           name: "{{ linux_user }}"
           generate_ssh_key: yes
           ssh_key_bits: 4096
-          ssh_key_file: ".ssh/borg_id"
+          ssh_key_file: ".ssh/borg_key"
   
-      - name: Öffentlichen Schlüssel übertragen
+      - name: Kopiere SSH-Key zum Backup-Server
         shell: |
           sshpass -p "kali" ssh-copy-id \
-          -i /home/{{ linux_user }}/.ssh/borg_id.pub \
+          -i /home/{{ linux_user }}/.ssh/borg_key.pub \
           -o StrictHostKeyChecking=no \
           {{ backup_user }}@{{ backup_server }}
-        when: not lookup('file', '/home/'+linux_user+'/.ssh/borg_id.pub', errors='ignore')
+        when: not lookup('file', '/home/'+linux_user+'/.ssh/borg_key.pub', errors='ignore')
   
-      - name: Borg-Repository initialisieren
+      - name: Initialisiere Borg Repository
         command: |
           borg init --encryption=repokey \
           {{ backup_user }}@{{ backup_server }}:{{ backup_dir }}/{{ ansible_hostname }} \
           -e "{{ encryption_pass }}"
         args:
-          creates: "{{ backup_dir }}/{{ ansible_hostname }}/config"  # Korrekter Pfad
+          creates: "{{ backup_dir }}/{{ ansible_hostname }}/config"
         changed_when: false
-        ignore_errors: yes
   
-      - name: Backup-Skript erstellen
+      - name: Erstelle Backup-Script
         copy:
-          dest: /home/{{ linux_user }}/borg-backup.sh
+          dest: /home/{{ linux_user }}/backup.sh
           mode: 0700
           content: |
             #!/bin/bash
-            export BORG_PASSPHRASE='{{ encryption_pass }}'
-            export BORG_RSH='ssh -i /home/{{ linux_user }}/.ssh/borg_id'
+            export BORG_PASSPHRASE='kali'
+            export BORG_RSH='ssh -i /home/{{ linux_user }}/.ssh/borg_key'
             
-            borg create --stats --compression zstd,3 \
-            {{ backup_user }}@{{ backup_server }}:{{ backup_dir }}/$(hostname)::'{now:%Y-%m-%d_%H:%M}' \
-              /etc \
-              /home \
-              /var/www \
+            borg create --stats {{ backup_user }}@{{ backup_server }}:{{ backup_dir }}/$(hostname)::'{now}' \
+              /etc /home /var/www \
               --exclude '*.tmp' \
               --exclude '*.cache'
             
             borg prune --keep-daily 7 {{ backup_user }}@{{ backup_server }}:{{ backup_dir }}/$(hostname)
   
-      - name: Cron-Job einrichten
+      - name: Setze Cron-Job
         cron:
-          name: "Tägliches Borg Backup"
-          job: "/home/{{ linux_user }}/borg-backup.sh"
-          minute: "15"
+          name: "Nightly Borg Backup"
+          job: "/home/{{ linux_user }}/backup.sh >/dev/null 2>&1"
+          minute: "0"
           hour: "2"
           user: "{{ linux_user }}"
