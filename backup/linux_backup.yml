@@ -34,8 +34,9 @@
       - name: Initialisiere Borg Repository
         command: |
           borg init --encryption=repokey \
-          {{ backup_user }}@{{ backup_server }}:{{ backup_dir }}/{{ ansible_hostname }} \
-          -e "{{ encryption_pass }}"
+          {{ backup_user }}@{{ backup_server }}:{{ backup_dir }}/{{ ansible_hostname }}
+        environment:
+          BORG_PASSPHRASE: "{{ encryption_pass }}"
         args:
           creates: "{{ backup_dir }}/{{ ansible_hostname }}/config"
   
