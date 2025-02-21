@@ -1,5 +1,5 @@
 ---
-  # borg-client-fix.yml
+  # borg-client-final.yml
   - name: BorgBackup Client Setup
     hosts: linux
     become: yes
@@ -11,24 +11,15 @@
       linux_user: "kali"
   
     tasks:
-      - name: Installiere zwingend Python3-Apt
+      - name: Installiere Python3 und notwendige Abhängigkeiten
         raw: |
           apt-get update
-          apt-get install -y python3-apt
-          test -f /usr/bin/python3 || ln -s /usr/bin/python3.* /usr/bin/python3
-        args:
-          executable: /bin/bash
-        changed_when: true
+          apt-get install -y python3 python3-apt
+          ln -sf /usr/bin/python3 /usr/bin/python
   
-      - name: Setze Python Interpreter
-        set_fact:
-          ansible_python_interpreter: /usr/bin/python3
-  
-      - name: Installiere BorgBackup
-        apt:
-          name: borgbackup
-          state: present
-          update_cache: yes
+      - name: BorgBackup manuell installieren (ohne apt-Modul)
+        raw: |
+          apt-get install -y borgbackup
   
       - name: Generiere SSH-Schlüssel
         user:
@@ -43,7 +34,6 @@
           -i /home/{{ linux_user }}/.ssh/borg_key.pub \
           -o StrictHostKeyChecking=no \
           {{ backup_user }}@{{ backup_server }}
-        when: not lookup('file', '/home/'+linux_user+'/.ssh/borg_key.pub', errors='ignore')
   
       - name: Initialisiere Borg Repository
         command: |
@@ -52,7 +42,6 @@
           -e "{{ encryption_pass }}"
         args:
           creates: "{{ backup_dir }}/{{ ansible_hostname }}/config"
-        changed_when: false
   
       - name: Erstelle Backup-Script
         copy:
