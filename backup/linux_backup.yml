@@ -1,12 +1,12 @@
 ---
   # backup-clients-only.yml
   - name: Configure Linux Clients for Borg Backup
-    hosts: linux_hosts
+    hosts: linux
     become: yes
     vars:
       backup_server: 192.168.72.131
       backup_user: backuper
-      backup_dir: "/backup"
+      backup_dir: "/mnt/backup/linux"
       encryption_pass: "kali"
       linux_user: "kali"
   
