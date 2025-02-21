@@ -15,6 +15,7 @@
         - "/home/*/downloads"
   
     tasks:
+  
       # Stellen Sie sicher, dass python3-apt installiert ist
       - name: Ensure python3-apt is installed
         raw: |
@@ -34,9 +35,11 @@
           content: "deb http://deb.borgbackup.org/release {{ ansible_distribution_release }} main"
         when: ansible_distribution == "Ubuntu" or ansible_distribution == "Debian"
   
-      # Importieren Sie den GPG-Schlüssel für das BorgBackup-Repository
+      # Importieren Sie den GPG-Schlüssel für das BorgBackup-Repository (korrigiert)
       - name: Import BorgBackup GPG key
-        command: curl -s https://deb.borgbackup.org/archive-key.asc | apt-key add -
+        apt_key:
+          url: "https://deb.borgbackup.org/archive-key.asc"
+          state: present
   
       # Aktualisieren Sie die Paketlisten und installieren Sie BorgBackup
       - name: Install BorgBackup using apt
