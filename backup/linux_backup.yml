@@ -1,63 +1,93 @@
 ---
-- name: Linux Server Backup mit Borg
-  hosts: linux
-  vars:
-    borg_repo: "backuper@192.168.72.131:/mnt/backup/linux/{{ ansible_hostname }}"
-    encryption_passphrase: "kali"
-    backup_dirs:
-      - /etc
-      - /home
-      - /var/www
-    exclude_patterns:
-      - "*.tmp"
-      - "*.cache"
-      - "/home/*/downloads"
-
-  tasks:
-    # Stellen Sie sicher, dass python3-apt installiert ist
-    
-    - name: Ensure python3-apt is installed
-      raw: |
-        if ! dpkg -s python3-apt >/dev/null 2>&1; then
-          apt update && apt install -y python3-apt
-        fi
-      changed_when: false
-
-    # Installieren Sie notwendige Abhängigkeiten für BorgBackup
-    - name: Install necessary dependencies for BorgBackup
-      shell: apt update && apt install -y libssl-dev libacl1-dev build-essential pkg-config
-
-    # Fügen Sie das BorgBackup-Repository hinzu
-    - name: Add BorgBackup repository
-      copy:
-        dest: /etc/apt/sources.list.d/borgbackup.list
-        content: "deb http://deb.borgbackup.org/release focal main"
-      when: ansible_distribution == "Ubuntu" and ansible_distribution_release == "focal"
-
-    # Initialisieren Sie das Backup-Repository (nur einmal nötig)
-    - name: Initialize the backup repository if it does not exist
-      become: false
-      command: "borg init --encryption=repokey {{ borg_repo }}"
-      args:
-        creates: "{{ borg_repo }}/config"  # Überprüft, ob das Repository bereits initialisiert wurde
-      environment:
-        BORG_PASSPHRASE: "{{ encryption_passphrase }}"
-
-    # Erstellen Sie ein Backup mit Ausschlussmuster
-    - name: Create a new backup with exclusion patterns
-      command: >
-        borg create --stats --progress --compression zstd
-        --exclude '{{ item }}'
-        {{ borg_repo }}::{{ ansible_hostname }}-{% now('local', '%Y-%m-%d_%H:%M:%S') %} 
-        {{ backup_dirs | join(' ') }}
-      loop: "{{ exclude_patterns }}"
-      environment:
-        BORG_PASSPHRASE: "{{ encryption_passphrase }}"
-        BORG_RSH: "ssh -i /path/to/linux_backup_key"
-
-    # Bereinigen Sie alte Backups
-    - name: Prune old backups
-      command: >
-        borg prune --keep-daily 7 --keep-weekly 4 --keep-monthly 6 {{ borg_repo }}
-      environment:
-        BORG_PASSPHRASE: "{{ encryption_passphrase }}"
+  - name: Linux Server Backup mit Borg
+    hosts: linux
+    become: yes
+    vars:
+      borg_repo: "backuper@192.168.72.131:/mnt/backup/linux/{{ ansible_hostname }}"
+      encryption_passphrase: "kali"
+      backup_dirs:
+        - /etc
+        - /home
+        - /var/www
+      exclude_patterns:
+        - "*.tmp"
+        - "*.cache"
+        - "/home/*/downloads"
+  
+    tasks:
+      # Stellen Sie sicher, dass python3-apt installiert ist
+      - name: Ensure python3-apt is installed
+        raw: |
+          if ! dpkg -s python3-apt >/dev/null 2>&1; then
+            apt update && apt install -y python3-apt
+          fi
+        changed_when: false
+  
+      # Installieren Sie notwendige Abhängigkeiten für BorgBackup
+      - name: Install necessary dependencies for BorgBackup
+        shell: apt update && apt install -y libssl-dev libacl1-dev build-essential pkg-config
+  
+      # Fügen Sie das BorgBackup-Repository hinzu
+      - name: Add BorgBackup repository
+        copy:
+          dest: /etc/apt/sources.list.d/borgbackup.list
+          content: "deb http://deb.borgbackup.org/release {{ ansible_distribution_release }} main"
+        when: ansible_distribution == "Ubuntu" or ansible_distribution == "Debian"
+  
+      # Importieren Sie den GPG-Schlüssel für das BorgBackup-Repository
+      - name: Import BorgBackup GPG key
+        command: curl -s https://deb.borgbackup.org/archive-key.asc | apt-key add -
+  
+      # Aktualisieren Sie die Paketlisten und installieren Sie BorgBackup
+      - name: Install BorgBackup using apt
+        apt:
+          name: borgbackup
+          state: present
+  
+      # Generieren Sie einen SSH-Schlüssel, falls noch keiner vorhanden ist
+      - name: Generate SSH key pair if it does not exist
+        user:
+          name: "{{ ansible_user }}"
+          generate_ssh_key: yes
+          ssh_key_bits: 4096
+          ssh_key_file: .ssh/id_rsa
+        when: not lookup('file', '~/.ssh/id_rsa.pub', errors='ignore')
+  
+      # Kopieren Sie den öffentlichen SSH-Schlüssel auf den Backup-Server
+      - name: Copy public SSH key to backup server
+        authorized_key:
+          user: backuper
+          state: present
+          key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+        delegate_to: "{{ '192.168.72.131' }}"
+        become: yes
+        become_user: backuper
+  
+      # Initialisieren Sie das Backup-Repository (nur einmal nötig)
+      - name: Initialize the backup repository if it does not exist
+        command: "borg init --encryption=repokey {{ borg_repo }}"
+        args:
+          creates: "{{ borg_repo }}/config"  # Überprüft, ob das Repository bereits initialisiert wurde
+        environment:
+          BORG_PASSPHRASE: "{{ encryption_passphrase }}"
+        delegate_to: localhost  # Delegieren Sie diesen Task an den lokalen Client
+        run_once: true  # Führen Sie diesen Task nur einmal aus
+  
+      # Erstellen Sie ein Backup mit Ausschlussmuster
+      - name: Create a new backup with exclusion patterns
+        command: >
+          borg create --stats --progress --compression zstd
+          --exclude '{{ item }}'
+          {{ borg_repo }}::{{ ansible_hostname }}-{% now('local', '%Y-%m-%d_%H:%M:%S') %} 
+          {{ backup_dirs | join(' ') }}
+        loop: "{{ exclude_patterns }}"
+        environment:
+          BORG_PASSPHRASE: "{{ encryption_passphrase }}"
+          BORG_RSH: "ssh -i /path/to/linux_backup_key"
+  
+      # Bereinigen Sie alte Backups
+      - name: Prune old backups
+        command: >
+          borg prune --keep-daily 7 --keep-weekly 4 --keep-monthly 6 {{ borg_repo }}
+        environment:
+          BORG_PASSPHRASE: "{{ encryption_passphrase }}"
