@@ -45,10 +45,10 @@
         mode: '0600'
       become: yes
 
-    - name: Import GPG public key on target host
+    - name: Import GPG public key on target host (systemwide)
       shell: |
-        gpg --import /home/{{ ansible_user }}/linux_backup.pubkey
-        gpg --list-keys | awk '/^pub/{getline; print $1}' | cut -c1-8
+        sudo gpg --import /home/{{ ansible_user }}/linux_backup.pubkey
+        sudo gpg --list-keys | awk '/^pub/{getline; print $1}' | cut -c1-8
       register: gpg_key_id_raw
       args:
         executable: /bin/bash
@@ -64,9 +64,18 @@
         msg: "Extracted GPG Key ID: {{ gpg_key_id }}"
       when: gpg_key_id is defined
 
-    - name: Trust the imported GPG key
+    - name: Debug systemwide GPG key list
+      shell: sudo gpg --list-keys
+      register: gpg_key_list
+      become: yes
+
+    - name: Show systemwide GPG key list
+      debug:
+        msg: "{{ gpg_key_list.stdout_lines }}"
+
+    - name: Trust the imported GPG key (systemwide)
       shell: |
-        echo "5" | gpg --command-fd 0 --status-fd 2 --edit-key {{ gpg_key_id }} trust save
+        echo "5" | sudo gpg --command-fd 0 --status-fd 2 --edit-key {{ gpg_key_id }} trust save
       args:
         executable: /bin/bash
       become: yes
