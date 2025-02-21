@@ -31,9 +31,17 @@
       args:
         executable: /bin/bash
 
-    - name: Debug SCP command
-      debug:
-        msg: "Running SCP command: scp {{ backup_server_user }}@{{ backup_server_ip }}:{{ gpg_pubkey_path }} /tmp/linux_backup.pubkey"
+    - name: Check if GPG public key exists on backup server
+      stat:
+        path: "{{ gpg_pubkey_path }}"
+      delegate_to: "{{ backup_server_ip }}"
+      run_once: true
+      register: pubkey_stat
+
+    - name: Fail if GPG public key does not exist
+      fail:
+        msg: "The GPG public key file '{{ gpg_pubkey_path }}' does not exist on the backup server."
+      when: not pubkey_stat.stat.exists
       delegate_to: localhost
       run_once: true
 
