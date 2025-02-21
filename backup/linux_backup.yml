@@ -27,12 +27,12 @@
           regexp: "^PasswordAuthentication"
           line: "PasswordAuthentication yes"
           state: present
-        notify: restart sshd
+        notify: restart ssh
   
     handlers:
-      - name: restart sshd
+      - name: restart ssh
         service:
-          name: sshd
+          name: ssh
           state: restarted
   
   - name: Configure Clients
