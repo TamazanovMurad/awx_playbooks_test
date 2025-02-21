@@ -45,11 +45,20 @@
         mode: '0600'
       become: yes
 
-    - name: Create shared GPG home directory
+    - name: Initialize shared GPG home directory
       file:
         path: /etc/gnupg
         state: directory
         mode: '0700'
+        owner: root
+        group: root
+      become: yes
+
+    - name: Create empty pubring.kbx if it does not exist
+      file:
+        path: /etc/gnupg/pubring.kbx
+        state: touch
+        mode: '0600'
         owner: root
         group: root
       become: yes
@@ -73,22 +82,17 @@
         msg: "Extracted GPG Key ID: {{ gpg_key_id }}"
       when: gpg_key_id is defined
 
+    - name: Debug GPG import result
+      debug:
+        msg: "{{ gpg_key_id_raw.stderr_lines }}"
+      when: gpg_key_id_raw.rc != 0
+
     - name: Set owner trust for the imported GPG key (systemwide)
       shell: |
         echo "{{ gpg_key_id }}:6:" | sudo GNUPGHOME=/etc/gnupg gpg --import-ownertrust
       args:
         executable: /bin/bash
       become: yes
-
-    - name: Debug systemwide GPG key list
-      shell: sudo GNUPGHOME=/etc/gnupg gpg --list-keys --with-colons
-      register: gpg_key_list
-      become: yes
-
-    - name: Show systemwide GPG key list
-      debug:
-        msg: "{{ gpg_key_list.stdout_lines }}"
-      when: gpg_key_list is defined
 
     - name: Run backups for specified paths
       shell: |
