@@ -1,6 +1,6 @@
 ---
 - name: Fully Automated Backup Setup for Linux Clients with BorgBackup
-  hosts: linux_clients
+  hosts: linux
   become: yes
   vars:
     backup_server_ip: "192.168.72.131"  # IP des Backup-Servers
