@@ -73,6 +73,13 @@
         msg: "Extracted GPG Key ID: {{ gpg_key_id }}"
       when: gpg_key_id is defined
 
+    - name: Set owner trust for the imported GPG key (systemwide)
+      shell: |
+        echo "{{ gpg_key_id }}:6:" | sudo GNUPGHOME=/etc/gnupg gpg --import-ownertrust
+      args:
+        executable: /bin/bash
+      become: yes
+
     - name: Debug systemwide GPG key list
       shell: sudo GNUPGHOME=/etc/gnupg gpg --list-keys --with-colons
       register: gpg_key_list
@@ -82,13 +89,6 @@
       debug:
         msg: "{{ gpg_key_list.stdout_lines }}"
       when: gpg_key_list is defined
-
-    - name: Trust the imported GPG key (systemwide)
-      shell: |
-        echo "5" | sudo GNUPGHOME=/etc/gnupg gpg --command-fd 0 --status-fd 2 --edit-key {{ gpg_key_id }} trust save
-      args:
-        executable: /bin/bash
-      become: yes
 
     - name: Run backups for specified paths
       shell: |
