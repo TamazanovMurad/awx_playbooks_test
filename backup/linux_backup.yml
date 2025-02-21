@@ -14,11 +14,29 @@
       - "/home/*/downloads"
 
   tasks:
+    - name: Python3-apt dependency installieren (raw)
+      become: true
+      raw: |
+        if ! dpkg -l | grep -q python3-apt; then
+          apt-get update
+          apt-get install -y python3-apt
+        fi
+      changed_when: false
+      args:
+        executable: /bin/bash
+
+    - name: Paket-Cache aktualisieren
+      become: true
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
     - name: BorgBackup installieren
+      become: true
       apt:
         name: borgbackup
         state: present
-
+        force_apt_get: yes
     - name: Backup-Repository initialisieren
       become: false
       command: "borg init --encryption=repokey {{ borg_repo }}"
