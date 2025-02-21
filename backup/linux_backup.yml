@@ -35,9 +35,16 @@
           content: "deb [signed-by=/usr/share/keyrings/borgbackup-archive-keyring.gpg] http://deb.borgbackup.org/release {{ ansible_distribution_release }} main"
         when: ansible_distribution == "Ubuntu" or ansible_distribution == "Debian"
   
-      # Importieren Sie den GPG-Schlüssel für das BorgBackup-Repository (korrigiert)
+            # Correct the GPG key import task
       - name: Import BorgBackup GPG key using curl and gpg
-        shell: curl -fsSL https://deb.borgbackup.org/archive-key.asc | gpg --dearmor -o /usr/share/keyrings/borgbackup-archive-keyring.gpg
+        shell: curl -fsSL https://borgbackup.org/archive-key.asc | gpg --dearmor -o /usr/share/keyrings/borgbackup-archive-keyring.gpg
+
+      # Correct the repository entry
+      - name: Add BorgBackup repository manually
+        copy:
+          dest: /etc/apt/sources.list.d/borgbackup.list
+          content: "deb [signed-by=/usr/share/keyrings/borgbackup-archive-keyring.gpg] https://deb.borgbackup.org/ {{ ansible_distribution_release }} main"
+        when: ansible_distribution == "Ubuntu" or ansible_distribution == "Debian"
   
       # Aktualisieren Sie die Paketlisten und installieren Sie BorgBackup
       - name: Install BorgBackup using apt
