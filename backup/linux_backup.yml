@@ -21,8 +21,11 @@
 
     # --- GRUPPE 1: SICHERSTELLEN, DASS ANSIBLE MODULE FUNKTIONIEREN ---
     - name: Ensure python3-apt is installed
-      raw: apt update && apt install -y python3-apt
-      when: ansible_distribution == "Ubuntu"
+      raw: |
+        if ! dpkg -s python3-apt >/dev/null 2>&1; then
+          apt update && apt install -y python3-apt
+        fi
+      changed_when: false
 
     # --- GRUPPE 2: INSTALLATION VON BORGBACKUP ---
     - name: Install BorgBackup on the client
