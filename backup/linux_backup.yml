@@ -1,11 +1,12 @@
 ---
-- name: Perform Incremental Backups with BorgBackup
-  hosts: linux_hosts
+- name: Fully Automated Backup Setup for Linux Clients with BorgBackup
+  hosts: linux_clients
   become: yes
   vars:
-    backup_server_ip: "192.168.72.131"
-    backup_repo_path: "ssh://backuper@{{ backup_server_ip }}/mnt/backup/linux/{{ ansible_hostname }}"
-    borg_passphrase: "your_secure_password"  # Ändern Sie dies in ein sicheres Passwort!
+    backup_server_ip: "192.168.72.131"  # IP des Backup-Servers
+    backup_user: "backuper"             # Benutzername auf dem Backup-Server
+    backup_repo_path: "ssh://{{ backup_user }}@{{ backup_server_ip }}/mnt/backup/linux/{{ ansible_hostname }}"
+    borg_passphrase: "kali"  # Ändern Sie dies in ein sicheres Passwort!
     exclude_files:
       - /dev/
       - /proc/
@@ -17,31 +18,32 @@
       - /lost+found
 
   tasks:
-    - name: Ensure BorgBackup is installed on client
+
+    # --- GRUPPE 1: INSTALLATION VON BORGBACKUP ---
+    - name: Install BorgBackup on the client
       apt:
         name: borgbackup
         state: present
-      tags: install
 
-    - name: Create SSH key if it does not exist
+    # --- GRUPPE 2: EINRICHTUNG PASSWORDFREIEN SSH-ZUGRIFFS ---
+    - name: Generate SSH key pair if it does not exist
       user:
         name: "{{ ansible_user }}"
         generate_ssh_key: yes
         ssh_key_bits: 2048
         ssh_key_file: .ssh/id_rsa
       when: not lookup('file', '~/.ssh/id_rsa.pub', errors='ignore')
-      tags: setup
 
     - name: Copy public SSH key to backup server
       authorized_key:
-        user: backuper
+        user: "{{ backup_user }}"
         state: present
         key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
       delegate_to: "{{ backup_server_ip }}"
       become: yes
-      become_user: backuper
-      tags: setup
+      become_user: "{{ backup_user }}"
 
+    # --- GRUPPE 3: BACKUP-AUSFÜHRUNG ---
     - name: Perform incremental backup
       command: >
         borg create
@@ -52,4 +54,4 @@
       loop: "{{ exclude_files }}"
       environment:
         BORG_PASSPHRASE: "{{ borg_passphrase }}"
-      tags: backup
+        
