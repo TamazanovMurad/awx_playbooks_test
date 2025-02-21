@@ -66,13 +66,13 @@
     - name: Import GPG public key on target host (systemwide)
       shell: |
         sudo GNUPGHOME=/etc/gnupg gpg --import /home/{{ ansible_user }}/linux_backup.pubkey
-        sudo GNUPGHOME=/etc/gnupg gpg --list-keys | awk '/^pub/{getline; print $1}' | cut -c1-8
+        sudo GNUPGHOME=/etc/gnupg gpg --list-keys | awk '/^pub/{print $2}' | cut -d'/' -f2
       register: gpg_key_id_raw
       args:
         executable: /bin/bash
       become: yes
 
-    - name: Set GPG key ID as fact (using short ID)
+    - name: Set GPG key ID as fact (using full fingerprint)
       set_fact:
         gpg_key_id: "{{ gpg_key_id_raw.stdout.strip() }}"
       become: yes
@@ -82,17 +82,22 @@
         msg: "Extracted GPG Key ID: {{ gpg_key_id }}"
       when: gpg_key_id is defined
 
-    - name: Debug GPG import result
-      debug:
-        msg: "{{ gpg_key_id_raw.stderr_lines }}"
-      when: gpg_key_id_raw.rc != 0
-
     - name: Set owner trust for the imported GPG key (systemwide)
       shell: |
         echo "{{ gpg_key_id }}:6:" | sudo GNUPGHOME=/etc/gnupg gpg --import-ownertrust
       args:
         executable: /bin/bash
       become: yes
+
+    - name: Debug systemwide GPG trust list
+      shell: sudo GNUPGHOME=/etc/gnupg gpg --list-keys --with-colons
+      register: gpg_trust_list
+      become: yes
+
+    - name: Show systemwide GPG trust list
+      debug:
+        msg: "{{ gpg_trust_list.stdout_lines }}"
+      when: gpg_trust_list is defined
 
     - name: Run backups for specified paths
       shell: |
