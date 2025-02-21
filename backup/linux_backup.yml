@@ -1,23 +1,30 @@
 ---
   # backup-clients-only.yml
   - name: Configure Linux Clients for Borg Backup
-    hosts: linux
+    hosts: linux_hosts
     become: yes
     vars:
-      backup_server: 192.168.72.131  # Statische IP des Backup-Servers
+      backup_server: 192.168.72.131
       backup_user: backuper
-      backup_dir: "/mnt/backup/linux"  # Muss auf dem Backup-Server existieren
-      encryption_pass: "kali"  # Passphrase für Borg
-      linux_user: "kali"  # Lokaler Client-User
+      backup_dir: "/backup"
+      encryption_pass: "kali"
+      linux_user: "kali"
   
     tasks:
+      - name: Install Python3-Apt (Voraussetzung für apt-Modul)
+        raw: |
+          if ! dpkg -s python3-apt >/dev/null 2>&1; then
+            apt update && apt install -y python3-apt
+          fi
+        changed_when: false
+  
       - name: Install BorgBackup
         apt:
           name: borgbackup
           state: latest
           update_cache: yes
   
-      - name: Generate SSH Keypair für Backup
+      - name: Generate SSH Keypair
         user:
           name: "{{ linux_user }}"
           generate_ssh_key: yes
@@ -38,7 +45,7 @@
           {{ backup_user }}@{{ backup_server }}:{{ backup_dir }}/{{ ansible_hostname }} \
           -e "{{ encryption_pass }}"
         args:
-          creates: "/backup/{{ ansible_hostname }}/config"  # Pfad auf dem Backup-Server!
+          creates: "/backup/{{ ansible_hostname }}/config"
         changed_when: false
         ignore_errors: yes
   
