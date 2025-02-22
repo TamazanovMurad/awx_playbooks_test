@@ -1,57 +1,41 @@
----
-- name: Backup Linux-Hosts mit BorgBackup
+- name: Backup-System für Linux-Hosts
   hosts: linux
   become: yes
   vars:
-    backup_server_ip: "192.168.72.131"  # IP des Backup-Servers
-    backup_repo_path: "/var/backups/borg"  # Pfad zum Borg-Repository
-    backup_user: "backuper"  # Benutzername auf dem Backup-Server
-    backup_directories:  # Verzeichnisse, die backuppen werden sollen
-      - "/etc"
-      - "/home"
-      - "/var/log"
+    backup_dir: "/backup"
+    backup_server: "192.168.72.131"
 
   tasks:
-    - name: Installiere notwendige Pakete
-      raw: |
-        apt-get update
-        apt-get install -y python3 python3-apt sshpass borgbackup
-        ln -sf /usr/bin/python3 /usr/bin/python
+    - name: Erstelle Backup-Verzeichnis auf dem Host
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        owner: backuper
+        group: backuper
 
+    - name: Erstelle System-Backup mit duplicity
+      shell: |
+        duplicity --full-if-older-than 1M \
+        --no-encryption \
+        / {{ backup_server }}::backup/{{ inventory_hostname }} \
+        --exclude /proc \
+        --exclude /sys \
+        --exclude /tmp \
+        --exclude /run \
+        --exclude /mnt \
+        --exclude /media \
+        --exclude /backup \
+        --exclude /lost+found \
+        --exclude /swap.img
+      args:
+        creates: "{{ backup_dir }}/{{ inventory_hostname }}_backup.tar.gz"
 
-    - name: Backup-Archiv erstellen
-      command: >
-        borg create
-        --stats
-        --progress
-        --compression lz4
-        --debug
-        {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}::backup-{now:%Y-%m-%d}
-        {{ backup_directories | join(' ') }}
-      register: backup_result
-      failed_when: backup_result.rc != 0
-      notify:
-        - show_backup_output
-
-    - name: Alte Backups bereinigen
-      command: >
-        borg prune
-        --list
-        --keep-daily=7
-        --keep-weekly=4
-        --keep-monthly=6
-        --debug
-        {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}
-      register: prune_result
-      failed_when: prune_result.rc != 0
-      notify:
-        - show_prune_output
-
-  handlers:
-    - name: show_backup_output
-      debug:
-        msg: "{{ backup_result.stdout_lines }}"
-
-    - name: show_prune_output
-      debug:
-        msg: "{{ prune_result.stdout_lines }}"
+    - name: Synchronisiere Backup mit dem Backup-Server
+      ansible.builtin.synchronize:
+        src: "{{ backup_dir }}/"
+        dest: "backuper@{{ backup_server }}:/backup/"
+        mode: push
+        ssh_args: "-o PubkeyAuthentication=no -o PasswordAuthentication=yes"
+      vars:
+        ansible_ssh_user: backuper
+        ansible_ssh_pass: kali
