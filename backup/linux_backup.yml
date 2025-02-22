@@ -12,11 +12,11 @@
       - "/var/log"
 
   tasks:
-    - name: Installiere notwendige Pakete
-      raw: |
-        apt-get update
-        apt-get install -y python3 python3-apt sshpass borgbackup
-        ln -sf /usr/bin/python3 /usr/bin/python
+    - name: Stelle sicher, dass BorgBackup installiert ist
+      apt:
+        name: borgbackup
+        state: present
+        update_cache: yes
 
     - name: Backup-Archiv erstellen
       command: >
@@ -24,8 +24,8 @@
         --stats
         --progress
         --compression lz4
-        --max-lock-wait 3600  # Wartezeit auf Lock erhöhen
-        --debug  # Debug-Optionen für mehr Informationen
+        --max-lock-wait 3600
+        --debug
         {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}::backup-{now:%Y-%m-%d}
         {{ backup_directories | join(' ') }}
       environment:
@@ -42,8 +42,8 @@
         --keep-daily=7
         --keep-weekly=4
         --keep-monthly=6
-        --max-lock-wait 3600  # Wartezeit auf Lock erhöhen
-        --debug  # Debug-Optionen für mehr Informationen
+        --max-lock-wait 3600
+        --debug
         {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}
       environment:
         BORG_RSH: "sshpass -p {{ backup_password }} ssh -o StrictHostKeyChecking=no"
