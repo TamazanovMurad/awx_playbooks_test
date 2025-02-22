@@ -2,7 +2,7 @@
   hosts: linux
   become: yes
   vars:
-    backup_server: "192.168.72.131"
+    backup_server: "192.168.72.131"  # korrekte IP
     backup_dir: "/backup"
     rsync_options: "-avz --exclude /proc --exclude /sys --exclude /tmp --exclude /run --exclude /mnt --exclude /media --exclude /backup --exclude /lost+found"
     ansible_ssh_common_args: "-o PubkeyAuthentication=no -o PasswordAuthentication=yes"
