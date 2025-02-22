@@ -1,0 +1,6 @@
+---
+- name: Test SSH Connection
+  hosts: linux
+  tasks:
+    - name: Test SSH connection
+      command: ssh -o BatchMode=yes -o ConnectTimeout=10 backuper@192.168.72.131 "echo 'SSH connection successful'"
