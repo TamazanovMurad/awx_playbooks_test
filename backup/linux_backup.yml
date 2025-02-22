@@ -2,8 +2,9 @@
   hosts: linux
   become: yes
   vars:
+    backup_server: "192.168.72.132"
     backup_dir: "/backup"
-    backup_server: "192.168.72.131"
+    rsync_options: "-avz --exclude /proc --exclude /sys --exclude /tmp --exclude /run --exclude /mnt --exclude /media --exclude /backup --exclude /lost+found"
 
   tasks:
     - name: Erstelle Backup-Verzeichnis auf dem Host
@@ -13,28 +14,11 @@
         owner: backuper
         group: backuper
 
-    - name: Erstelle System-Backup mit duplicity
-      shell: |
-        duplicity --full-if-older-than 1M \
-        --no-encryption \
-        / {{ backup_server }}::backup/{{ inventory_hostname }} \
-        --exclude /proc \
-        --exclude /sys \
-        --exclude /tmp \
-        --exclude /run \
-        --exclude /mnt \
-        --exclude /media \
-        --exclude /backup \
-        --exclude /lost+found \
-        --exclude /swap.img
-      args:
-        creates: "{{ backup_dir }}/{{ inventory_hostname }}_backup.tar.gz"
-
-    - name: Synchronisiere Backup mit dem Backup-Server
+    - name: Synchronisiere Dateien mit dem Backup-Server
       ansible.builtin.synchronize:
-        src: "{{ backup_dir }}/"
-        dest: "backuper@{{ backup_server }}:/backup/"
-        mode: push
+        src: "/"
+        dest: "backuper@{{ backup_server }}:{{ backup_dir }}/{{ inventory_hostname }}/"
+        rsync_opts: "{{ rsync_options }}"
         ssh_args: "-o PubkeyAuthentication=no -o PasswordAuthentication=yes"
       vars:
         ansible_ssh_user: backuper
