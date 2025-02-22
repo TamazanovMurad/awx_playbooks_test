@@ -6,17 +6,17 @@
     backup_server_ip: "192.168.72.131"  # IP des Backup-Servers
     backup_repo_path: "/var/backups/borg"  # Pfad zum Borg-Repository
     backup_user: "backuper"  # Benutzername auf dem Backup-Server
-    backup_password: "kali"  # Passwort des Benutzers
     backup_directories:  # Verzeichnisse, die backuppen werden sollen
+      - "/etc"
       - "/home"
       - "/var/log"
 
   tasks:
-    - name: Installiere notwendige Pakete
-      raw: |
-        apt-get update
-        apt-get install -y python3 python3-apt sshpass borgbackup
-        ln -sf /usr/bin/python3 /usr/bin/python
+    - name: Stelle sicher, dass BorgBackup installiert ist
+      apt:
+        name: borgbackup
+        state: present
+        update_cache: yes
 
     - name: Backup-Archiv erstellen
       command: >
@@ -28,7 +28,7 @@
         {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}::backup-{now:%Y-%m-%d}
         {{ backup_directories | join(' ') }}
       environment:
-        BORG_RSH: "sshpass -p {{ backup_password }} ssh -o StrictHostKeyChecking=no"
+        BORG_RSH: "ssh -o StrictHostKeyChecking=no"
       register: backup_result
       failed_when: backup_result.rc != 0
       notify:
@@ -44,7 +44,7 @@
         --debug
         {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}
       environment:
-        BORG_RSH: "sshpass -p {{ backup_password }} ssh -o StrictHostKeyChecking=no"
+        BORG_RSH: "ssh -o StrictHostKeyChecking=no"
       register: prune_result
       failed_when: prune_result.rc != 0
       notify:
