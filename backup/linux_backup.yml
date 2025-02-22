@@ -12,11 +12,11 @@
       - "/var/log"
 
   tasks:
-    - name: Stelle sicher, dass BorgBackup installiert ist
-      apt:
-        name: borgbackup
-        state: present
-        update_cache: yes
+    - name: Installiere notwendige Pakete
+      raw: |
+        apt-get update
+        apt-get install -y python3 python3-apt sshpass borgbackup
+        ln -sf /usr/bin/python3 /usr/bin/python
 
     - name: Backup-Archiv erstellen
       command: >
