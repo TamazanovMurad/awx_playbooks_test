@@ -28,8 +28,6 @@
         --debug
         {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}::backup-{now:%Y-%m-%d}
         {{ backup_directories | join(' ') }}
-      environment:
-        BORG_RSH: "ssh -o StrictHostKeyChecking=no"
       register: backup_result
       failed_when: backup_result.rc != 0
       notify:
@@ -44,8 +42,6 @@
         --keep-monthly=6
         --debug
         {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}
-      environment:
-        BORG_RSH: "ssh -o StrictHostKeyChecking=no"
       register: prune_result
       failed_when: prune_result.rc != 0
       notify:
