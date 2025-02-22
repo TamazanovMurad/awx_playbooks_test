@@ -3,7 +3,7 @@
   hosts: linux
   become: yes
   vars:
-    backup_server_ip: "192.168.72.128"
+    backup_server_ip: "192.168.72.131"
     backup_repo_path: "/var/backups/borg"
     backup_user: "backuper"
     backup_password: "kali"
