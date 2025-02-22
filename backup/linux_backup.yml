@@ -7,6 +7,8 @@
     backup_repo_path: "/var/backups/borg"
     backup_user: "backuper"
     backup_password: "kali"
+    backup_directories:  # Hier die zu backuppenden Verzeichnisse als Liste definieren
+      - "/var/www"  # Beispielverzeichnis, anpassen oder entfernen
 
   tasks:
     - name: Installiere notwendige Pakete
@@ -17,7 +19,7 @@
 
     - name: Backup-Archiv erstellen
       command: >
-        borg create --stats {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}::backup-{now:%Y-%m-%d} /home
+        borg create --stats {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}::backup-{now:%Y-%m-%d} {{ backup_directories | join(' ') }}
       environment:
         BORG_RSH: "sshpass -p {{ backup_password }} ssh -o StrictHostKeyChecking=no"
 
@@ -26,3 +28,8 @@
         borg prune --list --keep-daily=7 --keep-weekly=4 --keep-monthly=6 {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}
       environment:
         BORG_RSH: "sshpass -p {{ backup_password }} ssh -o StrictHostKeyChecking=no"
+
+  handlers:
+    - name: update cache
+      apt:
+        update_cache: yes
