@@ -3,33 +3,60 @@
   hosts: linux
   become: yes
   vars:
-    backup_server_ip: "192.168.72.131"
-    backup_repo_path: "/var/backups/borg"
-    backup_user: "backuper"
-    backup_password: "kali"
-    backup_directories:  # Hier die zu backuppenden Verzeichnisse als Liste definieren
-      - "/var/www"  # Beispielverzeichnis, anpassen oder entfernen
+    backup_server_ip: "192.168.72.131"  # IP des Backup-Servers
+    backup_repo_path: "/var/backups/borg"  # Pfad zum Borg-Repository
+    backup_user: "backuper"  # Benutzername auf dem Backup-Server
+    backup_password: "kali"  # Passwort des Benutzers
+    backup_directories:  # Verzeichnisse, die backuppen werden sollen
+      - "/home"
+      - "/var/log"
 
   tasks:
-    - name: Installiere notwendige Pakete
-      raw: |
-        apt-get update
-        apt-get install -y python3 python3-apt sshpass borgbackup
-        ln -sf /usr/bin/python3 /usr/bin/python
+    - name: Stelle sicher, dass BorgBackup installiert ist
+      apt:
+        name: borgbackup
+        state: present
+        update_cache: yes
 
     - name: Backup-Archiv erstellen
       command: >
-        borg create --stats {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}::backup-{now:%Y-%m-%d} {{ backup_directories | join(' ') }}
+        borg create
+        --stats
+        --progress
+        --compression lz4
+        --max-lock-wait 3600  # Wartezeit auf Lock erhöhen
+        --debug  # Debug-Optionen für mehr Informationen
+        {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}::backup-{now:%Y-%m-%d}
+        {{ backup_directories | join(' ') }}
       environment:
         BORG_RSH: "sshpass -p {{ backup_password }} ssh -o StrictHostKeyChecking=no"
+      register: backup_result
+      failed_when: backup_result.rc != 0
+      notify: 
+        - show_backup_output
 
     - name: Alte Backups bereinigen
       command: >
-        borg prune --list --keep-daily=7 --keep-weekly=4 --keep-monthly=6 {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}
+        borg prune
+        --list
+        --keep-daily=7
+        --keep-weekly=4
+        --keep-monthly=6
+        --max-lock-wait 3600  # Wartezeit auf Lock erhöhen
+        --debug  # Debug-Optionen für mehr Informationen
+        {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}
       environment:
         BORG_RSH: "sshpass -p {{ backup_password }} ssh -o StrictHostKeyChecking=no"
+      register: prune_result
+      failed_when: prune_result.rc != 0
+      notify: 
+        - show_prune_output
 
   handlers:
-    - name: update cache
-      apt:
-        update_cache: yes
+    - name: show_backup_output
+      debug:
+        msg: "{{ backup_result.stdout_lines }}"
+
+    - name: show_prune_output
+      debug:
+        msg: "{{ prune_result.stdout_lines }}"
