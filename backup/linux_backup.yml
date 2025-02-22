@@ -5,6 +5,7 @@
     backup_server: "192.168.72.132"
     backup_dir: "/backup"
     rsync_options: "-avz --exclude /proc --exclude /sys --exclude /tmp --exclude /run --exclude /mnt --exclude /media --exclude /backup --exclude /lost+found"
+    ansible_ssh_common_args: "-o PubkeyAuthentication=no -o PasswordAuthentication=yes"
 
   tasks:
     - name: Erstelle Backup-Verzeichnis auf dem Host
@@ -19,7 +20,7 @@
         src: "/"
         dest: "backuper@{{ backup_server }}:{{ backup_dir }}/{{ inventory_hostname }}/"
         rsync_opts: "{{ rsync_options }}"
-        ssh_args: "-o PubkeyAuthentication=no -o PasswordAuthentication=yes"
+        use_ssh_args: yes
       vars:
         ansible_ssh_user: backuper
         ansible_ssh_pass: kali
