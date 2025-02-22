@@ -1,65 +1,28 @@
 ---
-  # borg-client-final.yml
-  - name: BorgBackup Client Setup
-    hosts: linux
-    become: yes
-    vars:
-      backup_server: 192.168.72.131
-      backup_user: backuper
-      backup_dir: "/mnt/backup/linux"
-      encryption_pass: "kali"
-      linux_user: "kali"
-  
-    tasks:
-      - name: Installiere notwendige Pakete
-        raw: |
-          apt-get update
-          apt-get install -y python3 python3-apt sshpass borgbackup
-          ln -sf /usr/bin/python3 /usr/bin/python
-  
-      - name: Generiere SSH-Schlüssel
-        user:
-          name: "{{ linux_user }}"
-          generate_ssh_key: yes
-          ssh_key_bits: 4096
-          ssh_key_file: ".ssh/borg_key"
-  
-      - name: Kopiere SSH-Key zum Backup-Server
-        shell: |
-          sshpass -p "kali" ssh-copy-id \
-          -i /home/{{ linux_user }}/.ssh/borg_key.pub \
-          -o StrictHostKeyChecking=no \
-          {{ backup_user }}@{{ backup_server }}
-  
-      - name: Initialisiere Borg Repository
-        command: |
-          borg init --encryption=repokey \
-          {{ backup_user }}@{{ backup_server }}:{{ backup_dir }}/{{ ansible_hostname }}
-        environment:
-          BORG_PASSPHRASE: "{{ encryption_pass }}"
-        args:
-          creates: "{{ backup_dir }}/{{ ansible_hostname }}/config"
-  
-      - name: Erstelle Backup-Script
-        copy:
-          dest: /home/{{ linux_user }}/backup.sh
-          mode: 0700
-          content: |
-            #!/bin/bash
-            export BORG_PASSPHRASE='kali'
-            export BORG_RSH='ssh -i /home/{{ linux_user }}/.ssh/borg_key'
-            
-            borg create --stats {{ backup_user }}@{{ backup_server }}:{{ backup_dir }}/$(hostname)::'{now}' \
-              /etc /home /var/www \
-              --exclude '*.tmp' \
-              --exclude '*.cache'
-            
-            borg prune --keep-daily 7 {{ backup_user }}@{{ backup_server }}:{{ backup_dir }}/$(hostname)
-  
-      - name: Setze Cron-Job
-        cron:
-          name: "Nightly Borg Backup"
-          job: "/home/{{ linux_user }}/backup.sh >/dev/null 2>&1"
-          minute: "0"
-          hour: "2"
-          user: "{{ linux_user }}"
+- name: Backup Linux-Hosts mit BorgBackup
+  hosts: linux
+  become: yes
+  vars:
+    backup_server_ip: "192.168.72.128"
+    backup_repo_path: "/var/backups/borg"
+    backup_user: "backuper"
+    backup_password: "kali"
+
+  tasks:
+    - name: Installiere notwendige Pakete
+      raw: |
+        apt-get update
+        apt-get install -y python3 python3-apt sshpass borgbackup
+        ln -sf /usr/bin/python3 /usr/bin/python
+
+    - name: Backup-Archiv erstellen
+      command: >
+        borg create --stats {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}::backup-{now:%Y-%m-%d} /home
+      environment:
+        BORG_RSH: "sshpass -p {{ backup_password }} ssh -o StrictHostKeyChecking=no"
+
+    - name: Alte Backups bereinigen
+      command: >
+        borg prune --list --keep-daily=7 --keep-weekly=4 --keep-monthly=6 {{ backup_user }}@{{ backup_server_ip }}:{{ backup_repo_path }}
+      environment:
+        BORG_RSH: "sshpass -p {{ backup_password }} ssh -o StrictHostKeyChecking=no"
