@@ -8,12 +8,8 @@
     backup_server_ssh_port: 22          # SSH-Port des Backup-Servers
     borg_passphrase: "kali" # Passphrase für Borg (in Produktion Ansible Vault nutzen)
   tasks:
-    - name: Install required packages
-      ansible.builtin.apt:
-        name:
-          - borgbackup
-        state: present
-      become: yes
+    - name: Installiere Borg Backup
+      shell: apt install -y borgbackup
 
     - name: SSH-Schlüssel für root auf dem Host generieren
       command: ssh-keygen -t ed25519 -f /root/.ssh/id_ed25519 -N ""
