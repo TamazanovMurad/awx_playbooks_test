@@ -10,6 +10,12 @@
     repo_mirror: "deb http://mirrors.aliyun.com/kali kali-rolling main non-free contrib"
 
   tasks:
+    - name: Python3-Apt manuell installieren (falls nicht vorhanden)
+      shell: apt-get update && apt-get install -y python3-apt
+      args:
+        executable: /bin/bash
+      when: ansible_facts.packages | default([]) | selectattr('name', 'equalto', 'python3-apt') | list | length == 0
+
     - name: Ersetze Kali-Repository mit Aliyun-Spiegel
       lineinfile:
         path: /etc/apt/sources.list
@@ -26,7 +32,7 @@
         name: borgbackup
         state: present
         update_cache: yes
-        force_apt_get: yes  # Falls apt-get notwendig ist
+        force_apt_get: yes
       register: install_result
 
     - name: Debug-Ausgabe bei Installationsfehler
