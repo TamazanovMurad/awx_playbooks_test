@@ -1,6 +1,6 @@
 ---
 - name: Linux-Hosts für Backups konfigurieren
-  hosts: linux_hosts
+  hosts: linux
   become: yes
   vars:
     backup_server_ip: "192.168.100.137"  # IP deines Backup-Servers
