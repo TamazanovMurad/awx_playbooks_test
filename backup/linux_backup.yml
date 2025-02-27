@@ -10,34 +10,29 @@
     repo_mirror: "deb http://mirrors.aliyun.com/kali kali-rolling main non-free contrib"
 
   tasks:
-    - name: Python3-Apt manuell installieren (falls nicht vorhanden)
-      shell: apt-get update && apt-get install -y python3-apt
+    - name: APT-Repositories mit Aliyun-Spiegel aktualisieren
+      shell: |
+        sed -i 's/http.kali.org/mirrors.aliyun.com/g' /etc/apt/sources.list
       args:
         executable: /bin/bash
-      when: ansible_facts.packages | default([]) | selectattr('name', 'equalto', 'python3-apt') | list | length == 0
 
-    - name: Ersetze Kali-Repository mit Aliyun-Spiegel
-      lineinfile:
-        path: /etc/apt/sources.list
-        regex: '^deb http://kali.download/kali'
-        line: "{{ repo_mirror }}"
-      become: yes
-
-    - name: APT-Paketliste aktualisieren (mit shell-Modul)
+    - name: APT-Paketliste aktualisieren (shell)
       shell: apt-get update
       args:
         executable: /bin/bash
 
-    - name: Installiere Borg Backup (mit shell-Modul)
+    - name: Installiere Borg Backup (shell)
       shell: apt-get install -y borgbackup
-      register: install_result
       args:
         executable: /bin/bash
+      register: borg_install
+      ignore_errors: yes
 
-    - name: Debug-Ausgabe bei Installationsfehler
-      debug:
-        msg: "Fehler: {{ install_result.stderr }}"
-      when: install_result|failed
+    - name: Prüfe Borg Backup-Installation
+      assert:
+        that:
+          - borg_install.rc == 0
+        msg: "Borg Backup-Installation fehlgeschlagen. Fehler: {{ borg_install.stderr }}"
 
     - name: SSH-Schlüssel für root generieren
       shell: ssh-keygen -t ed25519 -f /root/.ssh/id_ed25519 -N ""
