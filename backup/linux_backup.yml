@@ -1,26 +1,65 @@
-- name: Backup-System für Linux-Hosts
-  hosts: linux
+---
+- name: Linux-Hosts für Backups konfigurieren
+  hosts: linux_hosts
   become: yes
   vars:
-    backup_server: "192.168.72.131"  # korrekte IP
-    backup_dir: "/backup"
-    rsync_options: "-avz --exclude /proc --exclude /sys --exclude /tmp --exclude /run --exclude /mnt --exclude /media --exclude /backup --exclude /lost+found"
-    ansible_ssh_common_args: "-o PubkeyAuthentication=no -o PasswordAuthentication=yes"
-
+    backup_server_ip: "192.168.100.137"  # IP deines Backup-Servers
+    backup_user: "backuper"             # Benutzer auf dem Backup-Server
+    backup_server_ssh_port: 22          # SSH-Port des Backup-Servers
+    borg_passphrase: "kali" # Passphrase für Borg (in Produktion Ansible Vault nutzen)
   tasks:
-    - name: Erstelle Backup-Verzeichnis auf dem Host
-      file:
-        path: "{{ backup_dir }}"
-        state: directory
-        owner: backuper
-        group: backuper
+    - name: Borg Backup auf dem Host installieren
+      apt:
+        name: borgbackup
+        state: present
+        update_cache: yes
 
-    - name: Synchronisiere Dateien mit dem Backup-Server
-      ansible.builtin.synchronize:
-        src: "/"
-        dest: "backuper@{{ backup_server }}:{{ backup_dir }}/{{ inventory_hostname }}/"
-        rsync_opts: "{{ rsync_options }}"
-        use_ssh_args: yes
-      vars:
-        ansible_ssh_user: backuper
-        ansible_ssh_pass: kali
+    - name: SSH-Schlüssel für root auf dem Host generieren
+      command: ssh-keygen -t ed25519 -f /root/.ssh/id_ed25519 -N ""
+      args:
+        creates: /root/.ssh/id_ed25519
+
+    - name: Öffentlichen Schlüssel vom Host abrufen
+      slurp:
+        src: /root/.ssh/id_ed25519.pub
+      register: pubkey
+
+    - name: Öffentlichen Schlüssel zum Backup-Server hinzufügen
+      delegate_to: "{{ backup_server_ip }}"
+      become: yes
+      become_user: "{{ backup_user }}"
+      lineinfile:
+        path: ~/.ssh/authorized_keys
+        line: "{{ pubkey['content'] | b64decode }}"
+        create: yes
+        mode: "0600"
+
+    - name: Borg-Repository auf dem Backup-Server initialisieren
+      command: borg init --encryption=repokey ssh://{{ backup_user }}@{{ backup_server_ip }}:{{ backup_server_ssh_port }}/home/{{ backup_user }}/backup/{{ inventory_hostname }}
+      environment:
+        BORG_PASSPHRASE: "{{ borg_passphrase }}"
+      args:
+        creates: /root/.borg-init-done
+      register: init_result
+      ignore_errors: yes
+
+    - name: Borg-Passphrase auf dem Host speichern
+      copy:
+        content: "{{ borg_passphrase }}"
+        dest: /root/.borg-passphrase
+        mode: "0600"
+
+    - name: Backup-Skript auf dem Host erstellen
+      copy:
+        dest: /usr/local/bin/backup_to_server.sh
+        content: |
+          #!/bin/bash
+          export BORG_PASSPHRASE=$(cat /root/.borg-passphrase)
+          borg create \
+              --exclude '/dev' --exclude '/proc' --exclude '/sys' --exclude '/tmp' \
+              ssh://{{ backup_user }}@{{ backup_server_ip }}:{{ backup_server_ssh_port }}/home/{{ backup_user }}/backup/{{ inventory_hostname }}::{now} \
+              /etc /home /var/lib /root
+          borg prune \
+              --keep-daily=7 --keep-weekly=4 --keep-monthly=12 \
+              ssh://{{ backup_user }}@{{ backup_server_ip }}:{{ backup_server_ssh_port }}/home/{{ backup_user }}/backup/{{ inventory_hostname }}
+        mode: "0700"
